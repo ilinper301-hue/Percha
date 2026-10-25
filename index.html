@@ -111,6 +111,19 @@ main{box-sizing:border-box;height:100%;overflow-y:auto;overscroll-behavior:conta
 .badge.r{left:auto;right:8px}
 .check{position:absolute;right:7px;bottom:7px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center}
 .check.auto{background:var(--surface);color:var(--muted);border:1px solid var(--line)}
+.check.no{background:var(--fg);color:var(--bg)}
+.tile.no .ph{opacity:.42}
+.badge.sug{background:var(--accent-soft);color:var(--accent)}
+.rules{margin:0;padding-left:20px;display:grid;gap:8px;font-size:14px;line-height:1.45}
+.rules b{font-weight:600}
+.grow{padding:12px 0;border-bottom:1px solid var(--line);display:grid;gap:6px}
+.grow>b{font-weight:500;font-size:14.5px;display:flex;gap:8px;align-items:center}
+.gl{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:13px}
+.gk{font-size:11px;color:var(--faint);width:66px;flex:none;white-space:nowrap;text-transform:uppercase;letter-spacing:.05em}
+.gsw{display:inline-flex;gap:5px;align-items:center;color:var(--muted)}
+.legend{display:grid;gap:8px;font-size:13px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:10px}
+.legend .check{position:static;flex:none;width:20px;height:20px}
 
 /* chips & segmented */
 .chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px))) ;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px}
@@ -370,7 +383,8 @@ const svgDataURL=svg=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg
 /* ---------- state ---------- */
 const S={
   items:[],pairs:new Set(),rules:[],wears:[],plan:{},
-  settings:{season:'auto',noRepeat:3,forgotten:21,lastExport:null,theme:'auto'},
+  blocks:new Set(),
+  settings:{season:'auto',noRepeat:3,forgotten:21,lastExport:null,theme:'auto',suggest:true,suggestLevel:'wide'},
   view:'hoy',flow:{active:false,step:0,top:null,bottom:null,shoes:null,outer:null,acc:null,target:null},
   armCat:'top',armSort:'recent',armLaundry:false,dataCat:'all',dataSort:'most',week:0,noStore:false
 };
@@ -398,7 +412,7 @@ const del=(s,k)=>tx(s,'readwrite',st=>st.delete(k)).catch(warn);
 const getAll=s=>tx(s,'readonly',st=>st.getAll()).catch(()=>[]);
 const clearStore=s=>tx(s,'readwrite',st=>st.clear()).catch(warn);
 const saveKV=(k,v)=>put('kv',{id:k,v});
-const savePairs=()=>saveKV('pairs',[...S.pairs]);
+const savePairs=()=>{saveKV('blocks',[...S.blocks]);return saveKV('pairs',[...S.pairs])};
 const saveRules=()=>saveKV('rules',S.rules);
 const savePlan=()=>saveKV('plan',S.plan);
 const saveSettings=()=>saveKV('settings',S.settings);
@@ -417,10 +431,68 @@ function currentSeason(){const s=S.settings.season;if(s!=='auto')return s;const 
 const inSeason=it=>{const c=currentSeason();return c==='all'||it.season==='all'||it.season===c};
 const available=it=>!it.laundry&&inSeason(it);
 const ruleMatch=(a,b)=>S.rules.some(r=>(r[0]===a.color&&r[1]===b.color)||(r[0]===b.color&&r[1]===a.color));
-function compatReason(a,b){if(!a||!b)return null;if(S.pairs.has(pairKey(a.id,b.id)))return 'pair';if(a.wild||b.wild)return 'wild';if(a.color&&b.color&&ruleMatch(a,b))return 'rule';return null}
+/* Guía de color: [combinan muy bien, combinan bien]. Basada en guías de estilo masculino:
+   neutros como base, contraste entre prendas, un solo color llamativo, calzado según el pantalón. */
+const TB={
+  'blanco':['azul,azul marino,negro,gris,beige,oliva','marrón,verde,granate,celeste,rojo,rosa,amarillo,naranja,morado,estampado'],
+  'negro':['gris,beige,azul,blanco','negro,oliva,granate,verde,rojo,celeste,estampado'],
+  'gris':['azul,azul marino,negro,blanco','beige,granate,oliva,celeste,rosa,morado'],
+  'beige':['azul,azul marino,marrón,oliva,blanco','negro,gris,verde,granate'],
+  'marrón':['beige,azul,blanco','oliva,azul marino,gris,celeste,verde'],
+  'azul marino':['beige,gris,blanco,oliva','azul,granate,marrón,celeste,rosa,verde,rojo'],
+  'azul':['blanco,beige,gris','azul marino,negro,marrón,oliva'],
+  'celeste':['azul marino,beige,gris,blanco','azul,negro,marrón'],
+  'verde':['beige,blanco,azul','negro,gris,marrón,azul marino'],
+  'oliva':['beige,blanco,azul,azul marino','negro,marrón,gris,granate'],
+  'rojo':['azul,negro,gris,blanco','beige,azul marino'],
+  'granate':['gris,beige,azul,blanco','negro,azul marino,oliva'],
+  'rosa':['azul,azul marino,gris,blanco,beige','negro'],
+  'amarillo':['blanco,azul,azul marino','oliva,gris,beige'],
+  'naranja':['azul,azul marino,blanco,beige','marrón,gris'],
+  'morado':['azul marino,gris,negro,blanco','beige,azul'],
+  'estampado':['azul,negro,beige,gris,blanco,azul marino','oliva,marrón']
+};
+const BS={
+  'negro':['negro,blanco','gris,granate'],
+  'gris':['negro,blanco','marrón,granate,azul marino'],
+  'azul marino':['marrón,blanco,beige','granate,gris'],
+  'azul':['blanco,marrón','beige,negro,gris,granate,azul marino'],
+  'beige':['marrón,blanco','azul marino,granate,beige,gris,verde'],
+  'oliva':['marrón,blanco','beige,granate,azul marino'],
+  'verde':['marrón,blanco','beige'],
+  'marrón':['blanco','marrón,beige,granate'],
+  'blanco':['marrón,beige,azul marino','blanco,negro,gris'],
+  'granate':['marrón,blanco','negro,beige'],
+  'rojo':['blanco','negro,marrón,beige'],
+  'estampado':['blanco','negro,marrón'],
+  '_':['blanco','marrón,beige,negro,gris']
+};
+const NEUTRAL=new Set(['negro','blanco','gris','beige','marrón','azul marino']);
+const BOLD=new Set(['rojo','rosa','amarillo','naranja','morado','verde','estampado']);
+const BASE_BOTTOMS=new Set(['negro','gris','azul','azul marino','beige','blanco']);
+const inList=(s,c)=>s.split(',').includes(c);
+function colorScore(top,bot,cat){ // cat: relación ('tb','bs','to')
+  if(cat==='tb'){const r=TB[top];if(!r)return 0;return inList(r[0],bot)?3:inList(r[1],bot)?2:0}
+  if(cat==='bs'){const r=BS[top]||BS._;if(inList(r[0],bot))return 3;if(inList(r[1],bot))return 2;if(NEUTRAL.has(bot))return 0;return BASE_BOTTOMS.has(top)?2:0}
+  // abrigo sobre parte de arriba
+  if(top===bot)return 1;const outerN=NEUTRAL.has(bot)||bot==='oliva'||bot==='granate';
+  if(outerN)return NEUTRAL.has(top)||top==='celeste'?3:2;return NEUTRAL.has(top)?2:0;
+}
+const styleOK=(a,b)=>{const A=a.styles||[],B=b.styles||[];return !A.length||!B.length||A.some(s=>B.includes(s))};
+function suggestScore(a,b){
+  if(S.settings.suggest===false||!a.color||!b.color||!styleOK(a,b))return 0;
+  const o={};o[a.cat]=a;o[b.cat]=b;let s=0;
+  if(o.top&&o.bottom)s=colorScore(o.top.color,o.bottom.color,'tb');
+  else if(o.bottom&&o.shoes)s=colorScore(o.bottom.color,o.shoes.color,'bs');
+  else if(o.top&&o.outer)s=colorScore(o.top.color,o.outer.color,'to');
+  return s>=(S.settings.suggestLevel==='strict'?3:2)?s:0;
+}
+function compatReason(a,b){if(!a||!b)return null;const k=pairKey(a.id,b.id);if(S.blocks.has(k))return null;if(S.pairs.has(k))return 'pair';if(a.wild||b.wild)return 'wild';if(a.color&&b.color&&ruleMatch(a,b))return 'rule';if(suggestScore(a,b))return 'suggest';return null}
 const compatible=(a,b)=>!!compatReason(a,b);
 const byFresh=(a,b)=>(lastOf(a.id)||'0').localeCompare(lastOf(b.id)||'0')||a.name.localeCompare(b.name,'es');
-function combos(filter){const f=filter||available;const T=S.items.filter(i=>i.cat==='top'&&f(i)),B=S.items.filter(i=>i.cat==='bottom'&&f(i)),H=S.items.filter(i=>i.cat==='shoes'&&f(i));const out=[];for(const t of T)for(const b of B){if(!compatible(t,b))continue;for(const h of H)if(compatible(b,h))out.push([t,b,h])}return out}
+function combos(filter){const f=filter||available;const T=S.items.filter(i=>i.cat==='top'&&f(i)),B=S.items.filter(i=>i.cat==='bottom'&&f(i)),H=S.items.filter(i=>i.cat==='shoes'&&f(i));const out=[];for(const t of T)for(const b of B){if(!compatible(t,b))continue;for(const h of H){if(!compatible(b,h))continue;if(!outfitOK(t,b,h))continue;out.push([t,b,h])}}return out}
+// Reglas del outfit completo: un solo color llamativo y nada de las tres prendas del mismo color, salvo que tú lo hayas marcado.
+function outfitOK(t,b,h){const mine=S.pairs.has(pairKey(t.id,b.id))&&S.pairs.has(pairKey(b.id,h.id));if(mine)return true;const cs=[t.color,b.color,h.color];if(cs.filter(c=>BOLD.has(c)).length>1)return false;if(cs[0]&&cs[0]===cs[1]&&cs[1]===cs[2]&&cs[0]!=='negro')return false;return true}
 function forgottenList(){const N=S.settings.forgotten,t=todayISO();return S.items.map(it=>{const l=lastOf(it.id);const ref=l||it.added||t;return {it,days:diffDays(t,ref),never:!l}}).filter(x=>x.days>=N).sort((a,b)=>b.days-a.days)}
 const hasDemo=()=>S.items.some(i=>i.demo);
 
@@ -485,18 +557,20 @@ function flowHTML(target){
   if(step>=3)return h+summaryHTML(target,isToday);
   const cat=ks[step],base=step?get(f[ks[step-1]]):null;
   const all=S.items.filter(i=>i.cat===cat),pool=all.filter(available),hidden=all.length-pool.length;
-  const good=(base?pool.filter(i=>compatible(i,base)):pool).sort(byFresh);
-  const other=base?pool.filter(i=>!compatible(i,base)).sort(byFresh):[];
+  const fits=i=>{if(!base)return true;const r=compatReason(i,base);if(!r)return false;if(r==='suggest'&&cat==='shoes'){const tp=get(f.top);if(tp&&!outfitOK(tp,base,i))return false}return true};
+  const rank=i=>{const r=base?compatReason(i,base):null;return r==='pair'?0:r==='suggest'&&suggestScore(i,base)===3?1:2};
+  const good=pool.filter(fits).sort((a,b)=>rank(a)-rank(b)||byFresh(a,b));
+  const other=base?pool.filter(i=>!fits(i)).sort(byFresh):[];
   const titles=['Parte de arriba','Parte de abajo','Calzado'];
   h+=`<div class="stephead"><div><h2 class="h2">${titles[step]}</h2><p class="sub">${base?'Combinan con '+esc(base.name):'Primero lo que hace más que no te pones'}</p></div>${step===0&&combos().length?`<button class="btn small" data-act="surprise">${ic('shuffle',16,1.8)}Sorpréndeme</button>`:''}</div>`;
   if(!all.length){
     h+=`<div class="empty"><h2 class="h2">Aún no hay ${CATS[cat].plural.toLowerCase()}</h2><p>Añade fotos de tu ropa desde el armario.</p><button class="btn dark" data-act="addItem" data-cat="${cat}">Añadir ${CATS[cat].one}</button></div>`;
   }else if(!good.length){
-    h+=`<div class="empty"><h2 class="h2">Nada marcado como compatible</h2><p>${base?'Indica qué '+(cat==='shoes'?'calzado':'prendas')+' combinan con '+esc(base.name)+'.':'Todo está en el cesto o fuera de temporada.'}</p>${base?`<button class="btn dark" data-act="compat" data-id="${base.id}">Configurar combinaciones</button>`:''}</div>`;
+    h+=`<div class="empty"><h2 class="h2">${base?'Nada combina con esto':'Nada disponible'}</h2><p>${base?(S.settings.suggest===false?'Indica qué '+(cat==='shoes'?'calzado':'prendas')+' combinan con '+esc(base.name)+'.':'No hay sugerencias para '+esc(base.name)+(base.color?'':' porque no tiene color asignado')+'. Puedes marcar tú las combinaciones o mirar en otras opciones.'):'Todo está en el cesto o fuera de temporada.'}</p>${base?`<button class="btn dark" data-act="compat" data-id="${base.id}">Configurar combinaciones</button>`:''}</div>`;
   }else{
-    h+=`<div class="grid">${good.map(i=>tile(i,{act:'pick'})).join('')}</div>`;
+    h+=`<div class="grid">${good.map(i=>tile(i,{act:'pick',sug:base&&compatReason(i,base)==='suggest'})).join('')}</div>`;
   }
-  if(other.length)h+=`<details class="others"${good.length?'':' open'}><summary>Otras opciones (${other.length}) ${ic('right',16)}</summary><p class="hint">No están marcadas como compatibles. Si eliges una, se guarda la combinación.</p><div class="grid">${other.map(i=>tile(i,{act:'pickNew',dim:true})).join('')}</div></details>`;
+  if(other.length)h+=`<details class="others"${good.length?'':' open'}><summary>Otras opciones (${other.length}) ${ic('right',16)}</summary><p class="hint">No combinan según tus marcas ni según la guía de color. Si eliges una, se guarda como combinación tuya.</p><div class="grid">${other.map(i=>tile(i,{act:'pickNew',dim:true})).join('')}</div></details>`;
   if(hidden)h+=`<p class="hint" style="margin-top:18px">${hidden} ${hidden===1?'prenda oculta':'prendas ocultas'} por estar en el cesto o fuera de temporada.</p>`;
   return h;
 }
@@ -513,9 +587,11 @@ function outfitCard(o){
   return `<div class="lay"><div class="lay-main"><div class="lay-stack">${main.map(it=>`<button class="lay-i${it.cat==='shoes'?' k2':''}" data-act="detail" data-id="${it.id}" aria-label="${esc(it.name)}">${imgTag(it)}</button>`).join('')}</div>${ex.length?`<div class="lay-ex">${ex.map(it=>`<button class="lay-x" data-act="detail" data-id="${it.id}" aria-label="${esc(it.name)}">${imgTag(it)}</button>`).join('')}</div>`:''}</div>
   <ul class="lay-names">${[...main,...ex].map(it=>`<li><span>${CATS[it.cat].label}</span><b>${esc(it.name)}</b></li>`).join('')}</ul></div>`;
 }
-function tile(it,{act='detail',sel=false,dim=false,meta=true,extra='',check=''}={}){
+function tile(it,{act='detail',sel=false,dim=false,meta=true,extra='',check='',sug=false,sub=null,base=null}={}){
   const u=usesOf(it.id);
-  return `<button class="tile${sel?' sel':''}${dim?' dim':''}${extra}" data-act="${act}" data-id="${it.id}"><span class="ph">${imgTag(it)}${it.laundry?'<span class="badge">En el cesto</span>':''}${it.wild&&meta?'<span class="badge r">Comodín</span>':''}${check}</span><span class="tn">${esc(it.name)}</span>${meta?`<span class="tm">${u} ${u===1?'uso':'usos'} · ${ago(lastOf(it.id))}</span>`:''}</button>`;
+  const corner=sug?'<span class="badge r sug">Sugerida</span>':it.wild&&meta?'<span class="badge r">Comodín</span>':'';
+  const line=sub!==null?`<span class="tm">${sub||'&nbsp;'}</span>`:meta?`<span class="tm">${u} ${u===1?'uso':'usos'} · ${ago(lastOf(it.id))}</span>`:'';
+  return `<button class="tile${sel?' sel':''}${dim?' dim':''}${extra}" data-act="${act}" data-id="${it.id}"${base?` data-base="${base}"`:''}><span class="ph">${imgTag(it)}${it.laundry?'<span class="badge">En el cesto</span>':''}${corner}${check}</span><span class="tn">${esc(it.name)}</span>${line}</button>`;
 }
 
 /* ----- ARMARIO ----- */
@@ -640,7 +716,7 @@ function drawEdit(){
   else if(!D.hasPhoto)h+=`<p class="hint" style="margin-top:-12px;text-align:center">Sin foto se usa una ilustración del color que elijas.</p>`;
   h+=`<div class="field"><label class="label" for="f-name">Nombre</label><input class="input" id="f-name" data-input="name" value="${esc(D.name)}" placeholder="Camiseta blanca de algodón" autocomplete="off"></div>`;
   h+=`<div class="field"><span class="label">Categoría</span>${segs('cat',CAT_ORDER.map(c=>[c,CATS[c].label]))}</div>`;
-  h+=`<div class="field"><span class="label">Color <span id="color-name" style="text-transform:none;letter-spacing:0;color:var(--fg)">${D.color?'· '+cap(D.color):''}</span></span><div class="sw">${COLORS.map(([n])=>`<button type="button" class="swc${D.color===n?' on':''}" data-act="color" data-v="${n}" style="background:${swatchBg(n)}" aria-label="${n}"></button>`).join('')}</div></div>`;
+  h+=`<div class="field"><span class="label">Color <span id="color-name" style="text-transform:none;letter-spacing:0;color:var(--fg)">${D.color?'· '+cap(D.color):''}</span></span><div class="sw">${COLORS.map(([n])=>`<button type="button" class="swc${D.color===n?' on':''}" data-act="color" data-v="${n}" style="background:${swatchBg(n)}" aria-label="${n}"></button>`).join('')}</div><p class="hint">Con el color, Percha te sugiere con qué combina. Elige el color dominante de la prenda.</p></div>`;
   h+=`<div class="field"><span class="label">Estilo</span>${segs('styles',Object.entries(STYLES),true)}</div>`;
   h+=`<div class="field"><span class="label">Temporada</span>${segs('season',Object.entries(SEASONS))}</div>`;
   h+=`<div class="field"><label class="label" for="f-price">Precio <span style="text-transform:none;letter-spacing:0">(opcional, para el coste por uso)</span></label><input class="input" id="f-price" data-input="price" inputmode="decimal" value="${D.price??''}" placeholder="25"></div>`;
@@ -703,14 +779,16 @@ async function saveItem(){
 function compatSheet(id,fresh){
   const it=get(id);if(!it)return closeSheet();
   let h=sheetHead('Combinaciones',fresh?'<span></span>':`<button class="link" data-act="detail" data-id="${id}">Atrás</button>`,`<button class="link strong" data-act="${fresh?'closeSheet':'detail'}" data-id="${id}">Listo</button>`)+`<div class="sh-body gut">`;
-  h+=`<div class="row" style="gap:14px">${mini(it,'style="width:56px;height:56px"')}<div style="min-width:0"><h2 class="h2">¿Con qué combina ${esc(it.name)}?</h2><p class="sub">Toca para marcar o desmarcar.</p></div></div>`;
+  h+=`<div class="row" style="gap:14px">${mini(it,'style="width:56px;height:56px"')}<div style="min-width:0"><h2 class="h2">¿Con qué combina ${esc(it.name)}?</h2><p class="sub">${S.settings.suggest===false?'Toca para marcar o desmarcar.':'Ya vienen sugerencias según el color. Toca para confirmar o descartar.'}</p></div></div>`;
   for(const rc of related(it.cat)){
     const list=S.items.filter(i=>i.cat===rc).sort((a,b)=>a.name.localeCompare(b.name,'es'));
     h+=`<div class="field"><div class="row between"><span class="label">${CATS[rc].plural}</span>${list.length?`<span class="row" style="gap:4px"><button class="link" style="font-size:13.5px" data-act="pairAll" data-id="${id}" data-cat="${rc}" data-on="1">Todas</button><button class="link" style="font-size:13.5px" data-act="pairAll" data-id="${id}" data-cat="${rc}" data-on="0">Ninguna</button></span>`:''}</div>`;
-    h+=list.length?`<div class="grid small">${list.map(o=>{const r=compatReason(it,o),explicit=S.pairs.has(pairKey(it.id,o.id)),auto=!explicit&&r;return tile(o,{act:'pairToggle',meta:false,extra:explicit?' on':auto?' auto':'',check:explicit?`<span class="check">${ic('check',14,2.4)}</span>`:auto?`<span class="check auto" title="${r==='wild'?'Comodín':'Regla de color'}">${ic('check',14,2.2)}</span>`:''}).replace('data-act="pairToggle"',`data-act="pairToggle" data-base="${id}"`)}).join('')}</div>`:`<p class="hint">Aún no tienes ${CATS[rc].plural.toLowerCase()}.</p>`;
+    h+=list.length?`<div class="grid small">${list.map(o=>{const k=pairKey(it.id,o.id),r=compatReason(it,o),explicit=r==='pair',blocked=S.blocks.has(k),auto=!explicit&&r;
+      const sub=explicit?'Tú':blocked?'Descartada':r==='suggest'?(suggestScore(it,o)===3?'Sugerida · clásica':'Sugerida'):r==='wild'?'Comodín':r==='rule'?'Tu regla':'';
+      return tile(o,{act:'pairToggle',base:id,meta:false,sub,extra:explicit?' on':auto?' auto':blocked?' no':'',check:explicit?`<span class="check">${ic('check',14,2.4)}</span>`:auto?`<span class="check auto">${ic('check',14,2.2)}</span>`:blocked?`<span class="check no">${ic('x',13,2.4)}</span>`:''})}).join('')}</div>`:`<p class="hint">Aún no tienes ${CATS[rc].plural.toLowerCase()}.</p>`;
     h+=`</div>`;
   }
-  h+=`<p class="hint">Las marcas grises vienen de un comodín o de una regla de color. Puedes cambiar las reglas en Ajustes.</p></div>`;
+  h+=`<div class="legend"><span><span class="check auto">${ic('check',12,2.2)}</span>Sugerida por color, comodín o regla. Un toque la confirma.</span><span><span class="check">${ic('check',12,2.4)}</span>Confirmada por ti. Otro toque la descarta.</span><span><span class="check no">${ic('x',11,2.4)}</span>Descartada: nunca se propone. Otro toque la devuelve a como estaba.</span></div>${it.color?'':`<p class="hint">Esta prenda no tiene color, así que no recibe sugerencias. Añádelo desde Editar.</p>`}</div>`;
   openSheet(h,{tall:true,refresh:()=>compatSheet(id,fresh)});
 }
 
@@ -755,10 +833,14 @@ function settingsSheet(){
   let h=sheetHead('Ajustes')+`<div class="sh-body gut">`;
   if(deferredInstall)h+=`<button class="btn primary block" data-act="install">Instalar Percha en el móvil</button>`;
   h+=`<div class="field"><span class="label">Apariencia</span><div class="seg">${[['auto','Sistema'],['light','Claro'],['dark','Oscuro']].map(([k,l])=>`<button class="pill${(s.theme||'auto')===k?' on':''}" data-act="setTheme" data-v="${k}">${l}</button>`).join('')}</div><p class="hint">${(s.theme||'auto')==='auto'?'Sigue el modo claro u oscuro de tu móvil.':'Siempre en modo '+(s.theme==='dark'?'oscuro':'claro')+'.'}</p></div>`;
+  const sOn=s.suggest!==false;
+  h+=`<div class="field"><span class="label">Sugerencias</span><div class="toggle"><div><b style="font-weight:500">Sugerir combinaciones por color</b><p>Percha propone qué combina según una guía de color y el estilo de cada prenda. Tus marcas manuales siempre mandan.</p></div><button class="switch" role="switch" aria-checked="${sOn}" data-act="suggestToggle" aria-label="Sugerir combinaciones por color"></button></div>`;
+  if(sOn)h+=`<div class="seg">${[['wide','Más variedad'],['strict','Solo clásicas']].map(([k,l])=>`<button class="pill${(s.suggestLevel||'wide')===k?' on':''}" data-act="setSuggestLevel" data-v="${k}">${l}</button>`).join('')}</div><p class="hint">${(s.suggestLevel||'wide')==='strict'?'Solo las combinaciones más seguras: neutros entre sí y pares de manual, como camiseta blanca con vaqueros o pantalón beige con calzado marrón.':'Incluye también combinaciones buenas con algo más de color, como granate con gris o verde con beige.'}</p><button class="btn block" data-act="colorGuide">Ver la guía de color</button>`;
+  h+=`</div>`;
   h+=`<div class="field"><span class="label">Temporada</span><div class="seg">${[['auto','Automática'],['warm','Calor'],['cold','Frío'],['all','Todo']].map(([k,l])=>`<button class="pill${s.season===k?' on':''}" data-act="setSeason" data-v="${k}">${l}</button>`).join('')}</div><p class="hint">${s.season==='auto'?'Según el mes: calor de junio a septiembre, frío de noviembre a marzo. Ahora: '+(cs==='all'?'entretiempo, se muestra todo':SEASONS[cs].toLowerCase())+'.':'Se ocultan las prendas de la otra temporada.'}</p></div>`;
   h+=`<div class="card"><div class="setrow"><p>No repetir prenda<small>En el plan semanal</small></p><div class="stepper"><button data-act="stepSet" data-k="noRepeat" data-d="-1" aria-label="Menos">−</button><span>${s.noRepeat}</span><button data-act="stepSet" data-k="noRepeat" data-d="1" aria-label="Más">+</button></div></div>
   <div class="setrow"><p>Prenda olvidada<small>Días sin usar</small></p><div class="stepper"><button data-act="stepSet" data-k="forgotten" data-d="-7" aria-label="Menos">−</button><span>${s.forgotten}</span><button data-act="stepSet" data-k="forgotten" data-d="7" aria-label="Más">+</button></div></div></div>`;
-  h+=`<div class="field"><span class="label">Reglas de color</span><p class="hint">Dos colores que siempre combinan. Se aplica a todas las prendas con esos colores.</p>`;
+  h+=`<div class="field"><span class="label">Tus reglas de color · opcional</span><p class="hint">Solo si quieres forzar que dos colores combinen aunque la guía no los proponga. Se aplica a todas las prendas con esos colores.</p>`;
   h+=S.rules.map((r,i)=>`<div class="row between" style="padding:6px 0"><span><span class="dot" style="background:${swatchBg(r[0])}"></span> ${cap(r[0])} &nbsp;+&nbsp; <span class="dot" style="background:${swatchBg(r[1])}"></span> ${cap(r[1])}</span><button class="iconbtn" data-act="delRule" data-i="${i}" aria-label="Quitar regla">${ic('x',18)}</button></div>`).join('');
   const opts=COLORS.map(([n])=>`<option value="${n}">${cap(n)}</option>`).join('');
   h+=`<div class="rulerow"><select class="sel" id="rule-a" aria-label="Primer color">${opts}</select><select class="sel" id="rule-b" aria-label="Segundo color">${opts.replace('value="beige"','value="beige" selected')}</select><button class="btn small" data-act="addRule">Añadir</button></div></div>`;
@@ -771,11 +853,21 @@ function settingsSheet(){
   h+=`</div><p class="hint" style="text-align:center">Percha · tus datos no salen de este dispositivo</p></div>`;
   openSheet(h,{tall:true,refresh:settingsSheet});
 }
+function guideSheet(){
+  const sw=list=>list.split(',').map(c=>`<span class="gsw" title="${cap(c)}"><span class="dot" style="background:${swatchBg(c)}"></span>${cap(c)}</span>`).join('');
+  const block=(title,table,rows,label)=>`<div class="field"><span class="label">${title}</span>${rows.map(k=>{const r=table[k];return `<div class="grow"><b><span class="dot" style="background:${swatchBg(k)}"></span>${label(k)}</b><div class="gl"><span class="gk">Muy bien</span>${sw(r[0])}</div><div class="gl"><span class="gk">Bien</span>${sw(r[1])}</div></div>`}).join('')}</div>`;
+  let h=sheetHead('Guía de color','<button class="link" data-act="settings">Atrás</button>')+`<div class="sh-body gut">`;
+  h+=`<div class="stack"><p class="hint" style="font-size:14px;color:var(--fg)">Las sugerencias siguen cuatro reglas de las guías de estilo:</p><ol class="rules"><li><b>Neutros como base.</b> Blanco, negro, gris, beige, marrón y azul marino combinan con casi todo. Vaqueros, chinos beige y pantalón gris son los fondos más seguros.</li><li><b>Contraste.</b> Mejor claro con oscuro. Dos prendas del mismo tono, como dos azules casi iguales, parecen un error.</li><li><b>Un solo color llamativo.</b> Rojo, rosa, amarillo, naranja, morado, verde o estampado: uno por outfit, el resto neutro.</li><li><b>Calzado según el pantalón.</b> Marrón con azul, beige y oliva. Negro con negro y gris. Nunca negro con beige, oliva o marrón. Las zapatillas blancas valen casi siempre.</li></ol><p class="hint">Además, las prendas tienen que compartir estilo: no se sugiere una camisa solo formal con un jogger solo de deporte.</p></div>`;
+  h+=block('Parte de arriba → pantalón',TB,Object.keys(TB),k=>'Arriba '+k);
+  h+=block('Pantalón → calzado',BS,Object.keys(BS),k=>k==='_'?'Pantalón de otro color':'Pantalón '+k);
+  h+=`</div>`;
+  openSheet(h,{tall:true});
+}
 function blobToDataURL(b){return new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=j;fr.readAsDataURL(b)})}
 function dataURLToBlob(u){const [h,b]=u.split(',');const mime=(h.match(/data:([^;,]+)/)||[])[1]||'application/octet-stream';if(/;base64/.test(h)){const bin=atob(b),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:mime})}return new Blob([decodeURIComponent(b)],{type:mime})}
 async function exportData(){
   const items=await Promise.all(S.items.map(async it=>({...it,img:it.img?await blobToDataURL(it.img):null})));
-  const data={app:'percha',version:1,exported:new Date().toISOString(),items,pairs:[...S.pairs],rules:S.rules,wears:S.wears,plan:S.plan,settings:S.settings};
+  const data={app:'percha',version:1,exported:new Date().toISOString(),items,pairs:[...S.pairs],blocks:[...S.blocks],rules:S.rules,wears:S.wears,plan:S.plan,settings:S.settings};
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
   const fname=`percha-copia-${todayISO()}.json`;
   const dl=window.claude&&window.claude.use?await window.claude.use('downloads').catch(()=>null):null;
@@ -788,7 +880,7 @@ async function applyImport(data){
   for(const s of['items','wears','kv'])await clearStore(s);
   for(const v of URLS.values())URL.revokeObjectURL(v.url);URLS.clear();
   S.items=data.items.map(it=>({...it,img:it.img?dataURLToBlob(it.img):svgBlob(garmentSVG(defaultKind[it.cat],it.color))}));
-  S.pairs=new Set(data.pairs||[]);S.rules=data.rules||[];S.wears=data.wears||[];S.plan=data.plan||{};S.settings={...S.settings,...(data.settings||{})};
+  S.pairs=new Set(data.pairs||[]);S.blocks=new Set(data.blocks||[]);S.rules=data.rules||[];S.wears=data.wears||[];S.plan=data.plan||{};S.settings={...S.settings,...(data.settings||{})};
   for(const it of S.items)await put('items',it);for(const w of S.wears)await put('wears',w);
   savePairs();saveRules();savePlan();saveSettings();saveKV('seeded',true);computeStats();
 }
@@ -831,7 +923,7 @@ const A={
   cancelTarget:()=>{resetFlow();S.view='semana';render()},
   goStep:d=>{const n=+d.step,ks=['top','bottom','shoes'];for(let i=n;i<3;i++)S.flow[ks[i]]=null;if(n===0)S.flow.outer=null;S.flow.step=n;S.flow.active=true;render()},
   pick:d=>{const it=get(d.id),f=S.flow;f.active=true;f[it.cat]=it.id;const order=['top','bottom','shoes'];const i=order.indexOf(it.cat);for(let j=i+1;j<3;j++)f[order[j]]=null;if(it.cat==='top'&&f.outer&&!compatible(get(f.outer),it))f.outer=null;f.step=i+1;render();scrollTop()},
-  pickNew:async d=>{const it=get(d.id),order=['top','bottom','shoes'],i=order.indexOf(it.cat),base=get(S.flow[order[i-1]]);if(base){await addPair(it.id,base.id);const k=pairKey(it.id,base.id);toast('Guardado: combina con '+base.name,{label:'Deshacer',fn:()=>{S.pairs.delete(k);savePairs();render()}})}A.pick(d)},
+  pickNew:async d=>{const it=get(d.id),order=['top','bottom','shoes'],i=order.indexOf(it.cat),base=get(S.flow[order[i-1]]);if(base){S.blocks.delete(pairKey(it.id,base.id));await addPair(it.id,base.id);const k=pairKey(it.id,base.id);toast('Guardado: combina con '+base.name,{label:'Deshacer',fn:()=>{S.pairs.delete(k);savePairs();render()}})}A.pick(d)},
   surprise:()=>{
     const cs=combos();if(!cs.length)return toast('Aún no hay combinaciones completas');
     const fresh=it=>{const l=lastOf(it.id);return l?Math.min(diffDays(todayISO(),l),60):60};
@@ -864,8 +956,9 @@ const A={
   askDelete:d=>{$('#del-zone').innerHTML=`<div class="confirm"><p>Se borra la prenda y sus combinaciones. Los outfits del historial se conservan.</p><div class="row"><button class="btn small danger" style="background:var(--surface)" data-act="doDelete" data-id="${d.id}">Eliminar</button><button class="btn small ghost" data-act="detail" data-id="${d.id}">Cancelar</button></div></div>`},
   doDelete:async d=>{await deleteItem(d.id);closeSheet();toast('Prenda eliminada')},
   compat:d=>compatSheet(d.id),
-  pairToggle:async d=>{const a=get(d.base),b=get(d.id),k=pairKey(a.id,b.id);if(S.pairs.has(k))S.pairs.delete(k);else{const r=compatReason(a,b);if(r==='wild'||r==='rule'){S.pairs.add(k)}else S.pairs.add(k)}await savePairs();refreshSheet()},
-  pairAll:async d=>{const a=get(d.id);for(const o of S.items.filter(i=>i.cat===d.cat)){const k=pairKey(a.id,o.id);if(d.on==='1')S.pairs.add(k);else S.pairs.delete(k)}await savePairs();refreshSheet()},
+  // ciclo: sugerida/nada → confirmada → descartada → sugerida/nada
+  pairToggle:async d=>{const k=pairKey(d.base,d.id);if(S.pairs.has(k)){S.pairs.delete(k);S.blocks.add(k)}else if(S.blocks.has(k))S.blocks.delete(k);else S.pairs.add(k);await savePairs();refreshSheet()},
+  pairAll:async d=>{const a=get(d.id);for(const o of S.items.filter(i=>i.cat===d.cat)){const k=pairKey(a.id,o.id);if(d.on==='1'){S.pairs.add(k);S.blocks.delete(k)}else{S.pairs.delete(k);S.blocks.add(k)}}await savePairs();refreshSheet()},
   // semana
   week:d=>{S.week+=+d.d;render()},
   genWeek:()=>{const ds=weekDates(),t=todayISO();for(const d of ds){const p=S.plan[d];if(d>=t&&p&&!p.locked)S.plan[d]={style:p.style||''}}const fails=generate(ds);render();toast(fails?`${fails} ${fails===1?'día':'días'} sin combinaciones posibles. Marca más combinaciones o cambia el estilo.`:'Semana generada')},
@@ -881,6 +974,9 @@ const A={
   // settings
   install:async()=>{if(!deferredInstall)return;deferredInstall.prompt();try{await deferredInstall.userChoice}catch(e){}deferredInstall=null;refreshSheet()},
   setSeason:d=>{S.settings.season=d.v;saveSettings();refreshSheet()},
+  suggestToggle:()=>{S.settings.suggest=S.settings.suggest===false;saveSettings();refreshSheet()},
+  setSuggestLevel:d=>{S.settings.suggestLevel=d.v;saveSettings();refreshSheet()},
+  colorGuide:()=>guideSheet(),
   setTheme:d=>{S.settings.theme=d.v;applyTheme(d.v);saveSettings();refreshSheet()},
   stepSet:d=>{const k=d.k,lim=k==='noRepeat'?[1,7]:[7,120];S.settings[k]=Math.max(lim[0],Math.min(lim[1],S.settings[k]+ +d.d));saveSettings();refreshSheet()},
   addRule:()=>{const a=$('#rule-a').value,b=$('#rule-b').value;if(a===b)return toast('Elige dos colores distintos');if(S.rules.some(r=>(r[0]===a&&r[1]===b)||(r[0]===b&&r[1]===a)))return toast('Esa regla ya existe');S.rules.push([a,b]);saveRules();refreshSheet();toast('Regla añadida')},
@@ -891,7 +987,7 @@ const A={
   importCancel:()=>{pendingImport=null;refreshSheet()},
   wipeAsk:()=>{confirmWipe=true;refreshSheet()},
   wipeCancel:()=>{confirmWipe=false;refreshSheet()},
-  wipeDo:async()=>{for(const s of['items','wears'])await clearStore(s);await clearStore('kv');await saveKV('seeded',true);S.items=[];S.pairs=new Set();S.rules=[];S.wears=[];S.plan={};resetFlow();computeStats();confirmWipe=false;closeSheet();toast('Datos borrados')}
+  wipeDo:async()=>{for(const s of['items','wears'])await clearStore(s);await clearStore('kv');await saveKV('seeded',true);S.items=[];S.pairs=new Set();S.blocks=new Set();S.rules=[];S.wears=[];S.plan={};resetFlow();computeStats();confirmWipe=false;closeSheet();toast('Datos borrados')}
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=A[el.dataset.act];if(f)f(el.dataset,el,e)});
 document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.input;if(!k||!D)return;if(k==='tol'){D.tol=+e.target.value;clearTimeout(D._t);D._t=setTimeout(processPhoto,140)}else D[k]=e.target.value});
@@ -939,7 +1035,7 @@ async function boot(){
   if(db){
     S.items=(await getAll('items'))||[];S.wears=(await getAll('wears'))||[];
     const kv=Object.fromEntries(((await getAll('kv'))||[]).map(r=>[r.id,r.v]));
-    S.pairs=new Set(kv.pairs||[]);S.rules=kv.rules||[];S.plan=kv.plan||{};Object.assign(S.settings,kv.settings||{});seeded=!!kv.seeded;
+    S.pairs=new Set(kv.pairs||[]);S.blocks=new Set(kv.blocks||[]);S.rules=kv.rules||[];S.plan=kv.plan||{};Object.assign(S.settings,kv.settings||{});seeded=!!kv.seeded;
   }
   if(!seeded)await seedDemo();
   applyTheme(S.settings.theme||'auto');
