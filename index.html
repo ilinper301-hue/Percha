@@ -749,7 +749,7 @@ function pickerSheet(cat){
 
 /* ---------- settings ---------- */
 let pendingImport=null,deferredInstall=null,confirmWipe=false;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e});
+window.addEventListener('beforeinstallprompt',e=>{deferredInstall=e});window.addEventListener('appinstalled',()=>{deferredInstall=null;toast('Percha instalada')});
 function settingsSheet(){
   const s=S.settings,cs=currentSeason();
   let h=sheetHead('Ajustes')+`<div class="sh-body gut">`;
