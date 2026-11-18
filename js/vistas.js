@@ -112,7 +112,7 @@ export function outfitCard(o){
   const full=o.top&&o.bottom&&o.shoes&&get(o.top)&&get(o.bottom)&&get(o.shoes),fav=full&&S.favs.some(f=>favKey(f)===favKey(o));
   const heart=full?`<button class="lay-fav${fav?' on':''}" data-act="favToggle" data-k="${favKey(o)}" aria-pressed="${fav}" aria-label="${fav?'Quitar de favoritos':'Guardar en favoritos'}">${ic('heart',22,1.8)}</button>`:'';
   return `<div class="lay">${heart}<div class="lay-main"><div class="lay-stack">${main.map(it=>`<button class="lay-i${it.cat==='shoes'?' k2':''}" data-act="detail" data-id="${it.id}" aria-label="${esc(it.name)}">${imgTag(it)}</button>`).join('')}</div>${ex.length?`<div class="lay-ex">${ex.map(it=>`<button class="lay-x" data-act="detail" data-id="${it.id}" aria-label="${esc(it.name)}">${imgTag(it)}</button>`).join('')}</div>`:''}</div>
-  <ul class="lay-names">${[...main,...ex].map(it=>`<li><span>${lay.includes(it)?(it.cat==='outer'?'Abrigo':'Capa'):CATS[it.cat].label}</span><b>${esc(it.name)}</b></li>`).join('')}</ul></div>`;
+  <ul class="lay-names">${[...main,...ex].map(it=>`<li><span>${lay.includes(it)?(lay.length>1?'Capa '+(lay.indexOf(it)+1):it.cat==='outer'?'Abrigo':'Capa'):CATS[it.cat].label}</span><b>${esc(it.name)}</b></li>`).join('')}</ul></div>`;
 }
 export function tile(it,{act='detail',sel=false,dim=false,meta=true,extra='',check='',sug=false,sub=null,base=null}={}){
   const u=usesOf(it.id);

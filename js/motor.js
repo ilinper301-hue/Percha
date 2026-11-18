@@ -52,7 +52,19 @@ export function generate(dates){
       for(const [it,wt] of [[tp,100],[bt,40],[sh,8]]){const dist=used[it.id];if(dist!==undefined)sc+=wt*(N+1-dist);sc+=usesOf(it.id)/maxU*12}
       if(sc<bs){bs=sc;best=[tp,bt,sh]}
     }
-    S.plan[d]={top:best[0].id,bottom:best[1].id,shoes:best[2].id,style};
+    // con frío, añade una capa de abrigo que combine con la prenda de arriba (se prefieren los de temporada fría y los poco usados)
+    let layers=[];
+    if(currentSeason()==='cold'){
+      let lb=null,ls=Infinity;
+      for(const o of S.items){
+        if(o.cat!=='outer'||!available(o)||(style&&!(o.styles||[]).includes(style))||!compatible(best[0],o))continue;
+        let sc=Math.random()*6+(o.season==='cold'?0:10)+usesOf(o.id)/maxU*12;
+        const dist=used[o.id];if(dist!==undefined)sc+=30*(N+1-dist);
+        if(sc<ls){ls=sc;lb=o}
+      }
+      if(lb)layers=[lb.id];
+    }
+    S.plan[d]={top:best[0].id,bottom:best[1].id,shoes:best[2].id,layers,style};
   }
   savePlan();return fails;
 }
