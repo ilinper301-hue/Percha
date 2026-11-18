@@ -9,8 +9,18 @@ export const CATS={
   acc:{label:'Accesorio',plural:'Accesorios',one:'accesorio'}
 };
 export const CAT_ORDER=['top','bottom','shoes','outer','acc'];
-export const SLOTS=CAT_ORDER;
-export const favKey=o=>SLOTS.map(k=>o&&o[k]||'').join('|');
+/* Un outfit: top, bottom, shoes y acc son una prenda cada uno; `layers` son las capas de encima, de dentro a fuera
+   (otra parte de arriba o abrigos). Los datos antiguos usaban `outer` (una sola prenda): `layersOf` lo acepta. */
+export const SLOTS=['top','bottom','shoes','acc'];
+export const LAYER_CATS=['top','outer'];
+export const layersOf=o=>o?(Array.isArray(o.layers)?o.layers:o.outer?[o.outer]:[]).filter(x=>typeof x==='string'&&x):[];
+export const outfitIds=o=>o?[o.top,o.bottom,o.shoes,...layersOf(o),o.acc].filter(Boolean):[];
+/* copia limpia de un outfit (sin `outer`); `ok(id)` decide qué prendas se conservan */
+export function pickOutfit(o,ok=()=>true){const r={};for(const k of SLOTS)r[k]=o&&o[k]&&ok(o[k])?o[k]:null;r.layers=[...new Set(layersOf(o).filter(ok))].filter(id=>id!==r.top);return r}
+/* pasa `outer` a `layers` y deja igual lo demás (style, locked…) */
+export const migrateOutfit=o=>{if(!o||!('outer' in o))return o;const {outer,...r}=o;r.layers=layersOf(o);return r};
+export const favKey=o=>{const p=pickOutfit(o);return [p.top,p.bottom,p.shoes,p.layers.join(','),p.acc].map(x=>x||'').join('|')};
+export const keyOutfit=k=>{const a=String(k).split('|');return {top:a[0]||null,bottom:a[1]||null,shoes:a[2]||null,layers:a[3]?a[3].split(','):[],acc:a[4]||null}};
 export const RELS=[['top','bottom'],['bottom','shoes'],['top','outer']];
 export const related=c=>RELS.filter(r=>r.includes(c)).map(r=>r[0]===c?r[1]:r[0]);
 export const COLORS=[['negro','#1E1E1C'],['blanco','#F7F6F1'],['gris','#9C9B96'],['beige','#D9C8A7'],['marrón','#7B5338'],['azul marino','#25324F'],['azul','#4B74B2'],['celeste','#A8C6E4'],['verde','#4F7A52'],['oliva','#6F6B3A'],['rojo','#B3342C'],['granate','#6C2431'],['rosa','#E5A9B4'],['amarillo','#E2BF4D'],['naranja','#D7773B'],['morado','#6A4C88'],['estampado','conic']];

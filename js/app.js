@@ -1,32 +1,34 @@
 /* Percha · app.js — Acciones, eventos y arranque. */
-import {$,SLOTS,diffDays,favKey,pairKey,todayISO,uid} from './datos.js';
-import {S,applyImport,cleanBackup,clearStore,db,del,dropURLs,ensureThumbs,exportData,get,getAll,idbOpen,put,readBackup,saveFavs,saveKV,savePairs,savePlan,saveRules,saveSettings,seedDemo,setDb} from './almacen.js';
+import {$,SLOTS,diffDays,favKey,keyOutfit,outfitIds,pairKey,pickOutfit,todayISO,uid} from './datos.js';
+import {S,applyImport,cleanBackup,clearStore,db,del,dropURLs,ensureThumbs,exportData,get,getAll,idbOpen,migrateOutfits,put,readBackup,saveFavs,saveKV,savePairs,savePlan,saveRules,saveSettings,seedDemo,setDb} from './almacen.js';
 import {combos,compatible,computeStats,generate,lastOf,weekDates} from './motor.js';
-import {D,applyTheme,armBar,armBody,armList,closeSheet,compatSheet,daySheet,detailSheet,drawEdit,editSheet,favSheet,guideSheet,loadPhoto,pickerSheet,processPhoto,refreshSheet,render,saveItem,setD,settingsSheet,syncColor,toast,updatePreview} from './vistas.js';
+import {D,applyTheme,armBar,armBody,armList,closeSheet,compatSheet,daySheet,detailSheet,drawEdit,editSheet,favSheet,guideSheet,layerSheet,loadPhoto,pickerSheet,processPhoto,refreshSheet,render,saveItem,setD,settingsSheet,syncColor,toast,updatePreview} from './vistas.js';
 
 export let pendingImport=null,deferredInstall=null,confirmWipe=false;
 window.addEventListener('beforeinstallprompt',e=>{deferredInstall=e});window.addEventListener('appinstalled',()=>{deferredInstall=null;toast('Percha instalada')});
 /* ---------- actions ---------- */
 const armListNow=()=>armList();
-export function resetFlow(keepTarget){const t=keepTarget?S.flow.target:null;S.flow={active:false,step:0,top:null,bottom:null,shoes:null,outer:null,acc:null,target:t}}
+export function resetFlow(keepTarget){const t=keepTarget?S.flow.target:null;S.flow={active:false,step:0,top:null,bottom:null,shoes:null,layers:[],acc:null,target:t}}
+const layersOfFlow=()=>Array.isArray(S.flow.layers)?S.flow.layers:[];
 export function scrollTop(){const v=$('#view');if(v)v.scrollTop=0}
 export async function addPair(a,b){S.pairs.add(pairKey(a,b));await savePairs()}
 export async function recordWear(o,date){
   const prev=S.wears.find(w=>w.date===date);
-  const w={id:prev?prev.id:uid(),date,top:o.top||null,bottom:o.bottom||null,shoes:o.shoes||null,outer:o.outer||null,acc:o.acc||null};
+  const w={id:prev?prev.id:uid(),date,...pickOutfit(o)};
   if(prev)S.wears[S.wears.indexOf(prev)]=w;else S.wears.push(w);
   await put('wears',w);computeStats();return !!prev;
 }
 /* quita de los favoritos las prendas borradas; si falta una principal, el favorito se elimina */
 function dropFavs(ids){
-  S.favs=S.favs.map(f=>{const o={...f};for(const k of SLOTS)if(ids.has(o[k]))o[k]=null;return o}).filter(f=>f.top&&f.bottom&&f.shoes);saveFavs();
+  S.favs=S.favs.map(f=>({id:f.id,...pickOutfit(f,id=>!ids.has(id))})).filter(f=>f.top&&f.bottom&&f.shoes);saveFavs();
 }
 export async function deleteItem(id){
   S.items=S.items.filter(i=>i.id!==id);await del('items',id);
   for(const k of [...S.pairs]){const [a,b]=k.split('|');if(a===id||b===id)S.pairs.delete(k)}
   for(const k of [...S.blocks]){const [a,b]=k.split('|');if(a===id||b===id)S.blocks.delete(k)}savePairs();
-  for(const [d,p] of Object.entries(S.plan))if(SLOTS.some(k=>p[k]===id))S.plan[d]={style:p.style};savePlan();dropFavs(new Set([id]));
+  for(const [d,p] of Object.entries(S.plan))if(outfitIds(p).includes(id))S.plan[d]={style:p.style};savePlan();dropFavs(new Set([id]));
   dropURLs(id);
+  S.flow.layers=layersOfFlow().filter(x=>x!==id);
   for(const k of SLOTS)if(S.flow[k]===id)resetFlow(true);
   computeStats();
 }
@@ -40,41 +42,44 @@ export const A={
     S.items=S.items.filter(i=>!ids.has(i.id));
     for(const k of [...S.pairs]){const [a,b]=k.split('|');if(ids.has(a)||ids.has(b))S.pairs.delete(k)}
     for(const k of [...S.blocks]){const [a,b]=k.split('|');if(ids.has(a)||ids.has(b))S.blocks.delete(k)}savePairs();
-    for(const w of S.wears.filter(w=>SLOTS.some(k=>ids.has(w[k]))))await del('wears',w.id);
-    S.wears=S.wears.filter(w=>!SLOTS.some(k=>ids.has(w[k])));
+    for(const w of S.wears.filter(w=>outfitIds(w).some(id=>ids.has(id))))await del('wears',w.id);
+    S.wears=S.wears.filter(w=>!outfitIds(w).some(id=>ids.has(id)));
     S.plan={};savePlan();dropFavs(ids);resetFlow();computeStats();
     if($('.scrim'))closeSheet();S.view='armario';S.armCat='top';render();toast('Listo. Añade tu primera prenda con el botón +');
   },
   favToggle:d=>{
-    const o={};SLOTS.forEach((k,i)=>{o[k]=d.k.split('|')[i]||null});const key=favKey(o);
+    const o=keyOutfit(d.k);const key=favKey(o);
     const ex=S.favs.find(f=>favKey(f)===key);
     if(ex){S.favs=S.favs.filter(f=>f!==ex);toast('Quitado de favoritos',{label:'Deshacer',fn:()=>{S.favs.push(ex);saveFavs();render();if($('.scrim'))refreshSheet()}})}
     else{S.favs.push({id:uid(),...o});toast('Guardado en favoritos')}
     saveFavs();render();if($('.scrim'))refreshSheet();
   },
   favSheet:()=>favSheet(),
-  favWear:async d=>{const f=S.favs.find(x=>x.id===d.id);if(!f)return;const o={};for(const k of SLOTS)o[k]=get(f[k])?f[k]:null;const t=todayISO();const was=await recordWear(o,t);if(S.plan[t])S.plan[t]={...S.plan[t],...o};savePlan();resetFlow();closeSheet();S.view='hoy';render();scrollTop();toast(was?'Outfit de hoy actualizado':'Registrado. Buen día.')},
-  favPlan:d=>{const f=S.favs.find(x=>x.id===d.id);if(!f||!d.date)return;const o={};for(const k of SLOTS)o[k]=get(f[k])?f[k]:null;const t=todayISO();
+  favWear:async d=>{const f=S.favs.find(x=>x.id===d.id);if(!f)return;const o=pickOutfit(f,id=>!!get(id));const t=todayISO();const was=await recordWear(o,t);if(S.plan[t])S.plan[t]={...S.plan[t],...o};savePlan();resetFlow();closeSheet();S.view='hoy';render();scrollTop();toast(was?'Outfit de hoy actualizado':'Registrado. Buen día.')},
+  favPlan:d=>{const f=S.favs.find(x=>x.id===d.id);if(!f||!d.date)return;const o=pickOutfit(f,id=>!!get(id));const t=todayISO();
     if(d.date===t){return A.favWear(d)}
     S.plan[d.date]={...o,style:(S.plan[d.date]||{}).style||'',locked:true};savePlan();closeSheet();S.view='semana';render();toast('Guardado y bloqueado en el plan')},
   // flow
   flowStart:()=>{resetFlow();S.flow.active=true;render();scrollTop()},
   flowReset:()=>{resetFlow(true);S.flow.active=true;render();scrollTop()},
   cancelTarget:()=>{resetFlow();S.view='semana';render()},
-  goStep:d=>{const n=+d.step,ks=['top','bottom','shoes'];S.flow.seed=null;for(let i=n;i<3;i++)S.flow[ks[i]]=null;if(n===0)S.flow.outer=null;S.flow.step=n;S.flow.active=true;render()},
+  goStep:d=>{const n=+d.step,ks=['top','bottom','shoes'];S.flow.seed=null;for(let i=n;i<3;i++)S.flow[ks[i]]=null;if(n===0)S.flow.layers=[];S.flow.step=n;S.flow.active=true;render()},
   outfitWith:d=>{const it=get(d.id);if(!it)return;const order=['top','bottom','shoes'];resetFlow();const f=S.flow;f.active=true;f[it.cat]=it.id;f.seed=it.id;let n=0;while(n<3&&f[order[n]])n++;f.step=n;if($('.scrim'))closeSheet();S.view='hoy';render();scrollTop()},
-  pick:d=>{const it=get(d.id),f=S.flow;f.active=true;f[it.cat]=it.id;const order=['top','bottom','shoes'];const i=order.indexOf(it.cat);const sd=get(f.seed);for(let j=i+1;j<3;j++)f[order[j]]=sd&&sd.cat===order[j]?sd.id:null;if(it.cat==='top'&&f.outer&&!compatible(get(f.outer),it))f.outer=null;let n=i+1;while(n<3&&f[order[n]])n++;f.step=n;render();scrollTop()},
+  pick:d=>{const it=get(d.id),f=S.flow;f.active=true;f[it.cat]=it.id;const order=['top','bottom','shoes'];const i=order.indexOf(it.cat);const sd=get(f.seed);for(let j=i+1;j<3;j++)f[order[j]]=sd&&sd.cat===order[j]?sd.id:null;if(it.cat==='top')f.layers=layersOfFlow().filter(id=>{const l=get(id);return l&&l.id!==it.id&&(l.cat!=='outer'||compatible(l,it))});let n=i+1;while(n<3&&f[order[n]])n++;f.step=n;render();scrollTop()},
   pickNew:async d=>{const it=get(d.id),order=['top','bottom','shoes'],i=order.indexOf(it.cat),base=get(S.flow[order[i-1]]);if(base){S.blocks.delete(pairKey(it.id,base.id));await addPair(it.id,base.id);const k=pairKey(it.id,base.id);toast('Guardado: combina con '+base.name,{label:'Deshacer',fn:()=>{S.pairs.delete(k);savePairs();render()}})}A.pick(d)},
   surprise:()=>{
     const cs=combos();if(!cs.length)return toast('Aún no hay combinaciones completas');
     const fresh=it=>{const l=lastOf(it.id);return l?Math.min(diffDays(todayISO(),l),60):60};
     let best=null,bs=-1;for(const c of cs){const sc=c.reduce((s,it)=>s+fresh(it),0)+Math.random()*40;if(sc>bs){bs=sc;best=c}}
-    Object.assign(S.flow,{active:true,top:best[0].id,bottom:best[1].id,shoes:best[2].id,step:3,outer:null,acc:null});render();scrollTop();
+    Object.assign(S.flow,{active:true,top:best[0].id,bottom:best[1].id,shoes:best[2].id,step:3,layers:[],acc:null});render();scrollTop();
   },
-  pickerExtra:d=>pickerSheet(d.cat),
+  pickerExtra:d=>d.cat==='layer'?layerSheet():pickerSheet(d.cat),
+  /* capas: de dentro a fuera; una parte de arriba nueva entra por debajo de los abrigos */
+  addLayer:d=>{const it=get(d.id);if(!it)return;const L=layersOfFlow().filter(x=>x!==it.id);let i=L.length;if(it.cat!=='outer'){const j=L.findIndex(x=>get(x)?.cat==='outer');if(j>=0)i=j}L.splice(i,0,it.id);S.flow.layers=L;closeSheet()},
+  delLayer:d=>{S.flow.layers=layersOfFlow().filter(x=>x!==d.id);render()},
   pickExtra:d=>{const it=get(d.id);const cat=it?it.cat:d.cat;S.flow[cat]=it?it.id:null;closeSheet()},
   confirmOutfit:async()=>{
-    const f=S.flow,t=todayISO(),target=f.target||t,o={top:f.top,bottom:f.bottom,shoes:f.shoes,outer:f.outer,acc:f.acc};
+    const f=S.flow,t=todayISO(),target=f.target||t,o=pickOutfit(f);
     if(target===t){const was=await recordWear(o,t);if(S.plan[t])S.plan[t]={...S.plan[t],...o};savePlan();resetFlow();S.view='hoy';render();scrollTop();toast(was?'Outfit de hoy actualizado':'Registrado. Buen día.')}
     else{S.plan[target]={...o,style:(S.plan[target]||{}).style||'',locked:true};savePlan();resetFlow();S.view='semana';render();toast('Guardado y bloqueado en el plan')}
   },
@@ -163,6 +168,7 @@ export async function boot(){
     S.items=(await getAll('items'))||[];S.wears=(await getAll('wears'))||[];
     const kv=Object.fromEntries(((await getAll('kv'))||[]).map(r=>[r.id,r.v]));
     S.pairs=new Set(kv.pairs||[]);S.blocks=new Set(kv.blocks||[]);S.rules=kv.rules||[];S.plan=kv.plan||{};S.favs=kv.favs||[];Object.assign(S.settings,kv.settings||{});seeded=!!kv.seeded;
+    await migrateOutfits();
   }
   if(!seeded)await seedDemo();
   applyTheme(S.settings.theme||'auto');

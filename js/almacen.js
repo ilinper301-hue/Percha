@@ -1,5 +1,5 @@
 /* Percha · almacen.js — Estado, IndexedDB, imágenes y copia de seguridad. */
-import {$,CATS,SEASONS,SLOTS,STYLES,addDays,cap,defaultKind,garmentSVG,pairKey,svgBlob,todayISO,uid} from './datos.js';
+import {$,CATS,SEASONS,STYLES,favKey,migrateOutfit,pickOutfit,addDays,cap,defaultKind,garmentSVG,pairKey,svgBlob,todayISO,uid} from './datos.js';
 import {computeStats} from './motor.js';
 import {applyTheme,refreshSheet,render,toast} from './vistas.js';
 
@@ -8,7 +8,7 @@ export const S={
   items:[],pairs:new Set(),rules:[],wears:[],plan:{},favs:[],
   blocks:new Set(),
   settings:{season:'auto',noRepeat:3,forgotten:21,lastExport:null,theme:'auto',suggest:true,suggestLevel:'wide'},
-  view:'hoy',flow:{active:false,step:0,top:null,bottom:null,shoes:null,outer:null,acc:null,target:null},
+  view:'hoy',flow:{active:false,step:0,top:null,bottom:null,shoes:null,layers:[],acc:null,target:null},
   armCat:'top',armSort:'recent',armLaundry:false,armQ:'',armColor:'',armStyle:'',armFilt:false,armSel:null,armDel:false,dataCat:'all',dataSort:'most',week:0,noStore:false
 };
 export const get=id=>id?S.items.find(i=>i.id===id):null;
@@ -136,16 +136,23 @@ export function cleanBackup(data){
   }
   if(!items.length&&data.items.length)throw new Error('ninguna prenda válida');
   for(const it of items)if(!it.img){it.img=svgBlob(garmentSVG(defaultKind[it.cat],it.color));it.illus=true}
-  const wears=(Array.isArray(data.wears)?data.wears:[]).filter(w=>isObj(w)&&isStr(w.id)&&isDate(w.date)).map(w=>{const o={id:w.id,date:w.date};for(const k of SLOTS)o[k]=ids.has(w[k])?w[k]:null;return o});
+  const ok=id=>ids.has(id);
+  const wears=(Array.isArray(data.wears)?data.wears:[]).filter(w=>isObj(w)&&isStr(w.id)&&isDate(w.date)).map(w=>({id:w.id,date:w.date,...pickOutfit(w,ok)}));
   const pairs=(Array.isArray(data.pairs)?data.pairs:[]).filter(k=>isStr(k)&&k.split('|').every(x=>ids.has(x)));
   const blocks=(Array.isArray(data.blocks)?data.blocks:[]).filter(k=>isStr(k)&&k.split('|').every(x=>ids.has(x)));
   const rules=(Array.isArray(data.rules)?data.rules:[]).filter(r=>Array.isArray(r)&&r.length===2&&r.every(isStr));
-  const plan={};if(isObj(data.plan))for(const [d,v] of Object.entries(data.plan))if(isDate(d)&&isObj(v)){const o={style:STYLES[v.style]?v.style:undefined};for(const k of SLOTS)if(ids.has(v[k]))o[k]=v[k];plan[d]=o}
-  const favs=[],seenF=new Set();for(const f of (Array.isArray(data.favs)?data.favs:[])){if(!isObj(f)||!isStr(f.id))continue;const o={id:f.id};for(const k of SLOTS)o[k]=ids.has(f[k])?f[k]:null;const key=SLOTS.map(k=>o[k]||'').join('|');if(!o.top||!o.bottom||!o.shoes||seenF.has(key))continue;seenF.add(key);favs.push(o)}
+  const plan={};if(isObj(data.plan))for(const [d,v] of Object.entries(data.plan))if(isDate(d)&&isObj(v)){const o={style:STYLES[v.style]?v.style:undefined},p=pickOutfit(v,ok);for(const k of ['top','bottom','shoes','acc'])if(p[k])o[k]=p[k];if(p.layers.length)o.layers=p.layers;plan[d]=o}
+  const favs=[],seenF=new Set();for(const f of (Array.isArray(data.favs)?data.favs:[])){if(!isObj(f)||!isStr(f.id))continue;const o={id:f.id,...pickOutfit(f,ok)};const key=favKey(o);if(!o.top||!o.bottom||!o.shoes||seenF.has(key))continue;seenF.add(key);favs.push(o)}
   const st=isObj(data.settings)?data.settings:{},settings={};
   for(const k of Object.keys(S.settings)){if(!(k in st))continue;if(k==='lastExport'){if(st[k]===null||isDate(st[k]))settings[k]=st[k]}else if(typeof st[k]===typeof S.settings[k])settings[k]=st[k]}
   if(!['auto','light','dark'].includes(settings.theme))delete settings.theme;
   return {items,wears,pairs,blocks,rules,plan,favs,settings};
+}
+/* datos anteriores a las capas: `outer` → `layers` (registros, plan y favoritos) */
+export async function migrateOutfits(){
+  for(let i=0;i<S.wears.length;i++){const w=S.wears[i];if(w&&'outer' in w){S.wears[i]=migrateOutfit(w);await put('wears',S.wears[i])}}
+  let p=false;for(const [d,v] of Object.entries(S.plan))if(v&&'outer' in v){S.plan[d]=migrateOutfit(v);p=true}if(p)savePlan();
+  let f=false;S.favs=S.favs.map(x=>{if(x&&'outer' in x){f=true;return migrateOutfit(x)}return x});if(f)saveFavs();
 }
 export async function applyImport(raw){
   const data=cleanBackup(raw); /* if anything is wrong this throws and the current data stays */
@@ -182,7 +189,7 @@ export async function seedDemo(){
   const P=[['tb','pc'],['tb','pn'],['tn','pc'],['sg','pc'],['sg','pn'],['sv','pg'],['sc','pc'],['sc','pn'],['pc','zn'],['pc','bm'],['pn','zn'],['pn','bm'],['pg','zn'],['sg','ab'],['sc','ab'],['tb','ab']];
   const W=[[-1,'tw','pj','zw'],[-2,'sc','pc','zn'],[-3,'sv','pg','zw'],[-5,'tb','pj','zw'],[-6,'tw','pc','zn'],[-8,'sg','pn','bm'],[-9,'tw','pj','zw'],[-11,'sc','pn','zn'],[-13,'tb','pc','bm'],[-15,'tw','pj','zw'],[-17,'sv','pj','zw'],[-20,'tw','pj','zw']];
   S.items=Object.values(I);S.pairs=new Set(P.map(([a,b])=>pairKey(I[a].id,I[b].id)));
-  S.wears=W.map(([o,a,b,c])=>({id:uid(),date:addDays(t,o),top:I[a].id,bottom:I[b].id,shoes:I[c].id,outer:null,acc:null}));
+  S.wears=W.map(([o,a,b,c])=>({id:uid(),date:addDays(t,o),top:I[a].id,bottom:I[b].id,shoes:I[c].id,layers:[],acc:null}));
   for(const it of S.items)await put('items',it);for(const w of S.wears)await put('wears',w);
   await savePairs();await saveKV('seeded',true);
 }

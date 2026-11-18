@@ -1,5 +1,5 @@
 /* Percha · vistas.js — Tema, toast, hojas y pantallas (Hoy, Armario, Semana, Datos, fichas, ajustes). */
-import {$,BS,CATS,addDays,favKey,CAT_ORDER,COLORS,DOW,DOWS,MON,MONS,SEASONS,SLOTS,STYLES,TB,ago,agoShort,cap,defaultKind,diffDays,esc,euro,fmtLong,fmtShort,garmentSVG,ic,pairKey,parseD,related,svgBlob,svgDataURL,swatchBg,todayISO,uid} from './datos.js';
+import {$,BS,CATS,addDays,favKey,layersOf,outfitIds,CAT_ORDER,COLORS,DOW,DOWS,MON,MONS,SEASONS,STYLES,TB,ago,agoShort,cap,defaultKind,diffDays,esc,euro,fmtLong,fmtShort,garmentSVG,ic,pairKey,parseD,related,svgBlob,svgDataURL,swatchBg,todayISO,uid} from './datos.js';
 import {CAN_SHARE,IMG_MAX,S,THUMB_MAX,del,encodeCanvas,get,imgTag,mini,put,savePairs,scaleCanvas,urlFor} from './almacen.js';
 import {available,byFresh,combos,compatReason,compatible,computeStats,currentSeason,forgottenList,hasDemo,lastOf,outfitOK,suggestScore,usesOf,weekDates} from './motor.js';
 import {confirmWipe,deferredInstall,pendingImport} from './app.js';
@@ -100,18 +100,19 @@ export function flowHTML(target){
 }
 export function summaryHTML(target,isToday){
   const f=S.flow;let h=outfitCard(f);
-  const extras=['outer','acc'].filter(k=>S.items.some(i=>i.cat===k&&available(i)));
-  if(extras.length){h+=`<div class="stack" style="margin-top:12px">`+extras.map(k=>{const it=get(f[k]);return `<button class="extra" data-act="pickerExtra" data-cat="${k}">${it?mini(it)+`<span><b>${esc(it.name)}</b><br>${CATS[k].label} · cambiar</span>`:`${ic('plus',20)}<span>Añadir ${CATS[k].one} <span style="color:var(--muted)">(opcional)</span></span>`}</button>`}).join('')+`</div>`}
+  const L=layersOf(f).map(get).filter(Boolean),canLayer=layerPool().length>0;
+  const extras=['acc'].filter(k=>S.items.some(i=>i.cat===k&&available(i)));
+  if(L.length||canLayer||extras.length){h+=`<div class="stack" style="margin-top:12px">`+L.map((it,i)=>`<div class="extra">${mini(it)}<span style="flex:1"><b>${esc(it.name)}</b><br>Capa ${i+1}${L.length>1?(i===0?' · la de dentro':i===L.length-1?' · la de fuera':''):''}</span><button class="iconbtn" data-act="delLayer" data-id="${it.id}" aria-label="Quitar ${esc(it.name)}">${ic('x',18)}</button></div>`).join('')+(canLayer?`<button class="extra" data-act="pickerExtra" data-cat="layer">${ic('plus',20)}<span>${L.length?'Añadir otra capa':'Añadir capa'} <span style="color:var(--muted)">(jersey, abrigo… opcional)</span></span></button>`:'')+extras.map(k=>{const it=get(f[k]);return `<button class="extra" data-act="pickerExtra" data-cat="${k}">${it?mini(it)+`<span><b>${esc(it.name)}</b><br>${CATS[k].label} · cambiar</span>`:`${ic('plus',20)}<span>Añadir ${CATS[k].one} <span style="color:var(--muted)">(opcional)</span></span>`}</button>`}).join('')+`</div>`}
   h+=`<div class="actions"><button class="btn primary block" data-act="confirmOutfit">${isToday?'Me lo pongo hoy':'Guardar en el plan'}</button><button class="btn ghost block" data-act="flowReset">Empezar de nuevo</button></div>`;
   return h;
 }
 export function outfitCard(o){
-  const main=['top','bottom','shoes'].map(k=>get(o[k])).filter(Boolean),ex=['outer','acc'].map(k=>get(o[k])).filter(Boolean);
+  const main=['top','bottom','shoes'].map(k=>get(o[k])).filter(Boolean),lay=layersOf(o).map(get).filter(Boolean),ex=[...lay,get(o.acc)].filter(Boolean);
   if(!main.length&&!ex.length)return `<div class="empty"><p>Las prendas de este outfit ya no están en tu armario.</p></div>`;
   const full=o.top&&o.bottom&&o.shoes&&get(o.top)&&get(o.bottom)&&get(o.shoes),fav=full&&S.favs.some(f=>favKey(f)===favKey(o));
   const heart=full?`<button class="lay-fav${fav?' on':''}" data-act="favToggle" data-k="${favKey(o)}" aria-pressed="${fav}" aria-label="${fav?'Quitar de favoritos':'Guardar en favoritos'}">${ic('heart',22,1.8)}</button>`:'';
   return `<div class="lay">${heart}<div class="lay-main"><div class="lay-stack">${main.map(it=>`<button class="lay-i${it.cat==='shoes'?' k2':''}" data-act="detail" data-id="${it.id}" aria-label="${esc(it.name)}">${imgTag(it)}</button>`).join('')}</div>${ex.length?`<div class="lay-ex">${ex.map(it=>`<button class="lay-x" data-act="detail" data-id="${it.id}" aria-label="${esc(it.name)}">${imgTag(it)}</button>`).join('')}</div>`:''}</div>
-  <ul class="lay-names">${[...main,...ex].map(it=>`<li><span>${CATS[it.cat].label}</span><b>${esc(it.name)}</b></li>`).join('')}</ul></div>`;
+  <ul class="lay-names">${[...main,...ex].map(it=>`<li><span>${lay.includes(it)?(it.cat==='outer'?'Abrigo':'Capa'):CATS[it.cat].label}</span><b>${esc(it.name)}</b></li>`).join('')}</ul></div>`;
 }
 export function tile(it,{act='detail',sel=false,dim=false,meta=true,extra='',check='',sug=false,sub=null,base=null}={}){
   const u=usesOf(it.id);
@@ -175,7 +176,7 @@ export function viewSemana(){
   h+=`<ul class="days">`+ds.map(d=>{
     const dd=parseD(d),past=d<t,p=S.plan[d]||{},w=S.wears.find(x=>x.date===d);
     const o=w||(p.top?p:null);
-    const fits=o?['top','bottom','shoes','outer','acc'].map(k=>get(o[k])).filter(Boolean).map(it=>mini(it)).join(''):`<span class="none">${past?'Sin registro':'Sin plan'}</span>`;
+    const fits=o?outfitIds(o).map(get).filter(Boolean).map(it=>mini(it)).join(''):`<span class="none">${past?'Sin registro':'Sin plan'}</span>`;
     const meta=[w?'<span class="tag acc">Llevado</span>':'',p.style&&!w?`<span class="tag">${STYLES[p.style]}</span>`:'',p.locked&&!w?ic('lock',16):''].join('');
     return `<li><button class="day${d===t?' today':''}${past&&!w?' past':''}" data-act="daySheet" data-date="${d}"><span class="dname">${DOWS[dd.getDay()]}<b>${dd.getDate()}</b></span><span class="dfits">${fits}</span><span class="dmeta">${meta}</span></button></li>`;
   }).join('')+`</ul>`;
@@ -184,7 +185,7 @@ export function viewSemana(){
 /* ----- DATOS ----- */
 /* ----- favoritos ----- */
 export function favSheet(){
-  const list=S.favs.map(f=>({f,its:SLOTS.map(k=>get(f[k])).filter(Boolean)})).filter(x=>x.its.length>=3);
+  const list=S.favs.map(f=>({f,its:outfitIds(f).map(get).filter(Boolean)})).filter(x=>x.its.length>=3);
   let h=sheetHead('Favoritos')+`<div class="sh-body gut">`;
   const t=todayISO(),days=[...Array(7)].map((_,i)=>addDays(t,i));
   h+=list.length?`<div class="stack">`+list.map(({f,its})=>{const bad=its.filter(it=>!available(it));return `<div class="favbox"><div class="favrow"><button class="favfits" tabindex="-1" aria-hidden="true">${its.map(it=>mini(it)).join('')}</button><span class="favn">${its.map(it=>esc(it.name)).join(' · ')}</span><button class="iconbtn" data-act="favToggle" data-k="${favKey(f)}" aria-label="Quitar de favoritos">${ic('x',18)}</button></div>
@@ -239,7 +240,7 @@ export function viewDatos(){
   h+=`</section>`;
   // history
   const hist=[...S.wears].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,20);
-  h+=`<section class="sec"><h2 class="h2">Historial</h2>${hist.length?hist.map(w=>`<div class="hist"><span class="d">${fmtShort(w.date)}</span><span class="dfits">${SLOTS.map(k=>get(w[k])).filter(Boolean).map(it=>mini(it)).join('')}</span><button class="iconbtn" data-act="delWear" data-id="${w.id}" aria-label="Borrar registro">${ic('x',18)}</button></div>`).join(''):'<p class="hint">Todavía no has registrado ningún outfit.</p>'}</section>`;
+  h+=`<section class="sec"><h2 class="h2">Historial</h2>${hist.length?hist.map(w=>`<div class="hist"><span class="d">${fmtShort(w.date)}</span><span class="dfits">${outfitIds(w).map(get).filter(Boolean).map(it=>mini(it)).join('')}</span><button class="iconbtn" data-act="delWear" data-id="${w.id}" aria-label="Borrar registro">${ic('x',18)}</button></div>`).join(''):'<p class="hint">Todavía no has registrado ningún outfit.</p>'}</section>`;
   return h;
 }
 
@@ -407,7 +408,19 @@ export function daySheet(d){
   openSheet(h,{refresh:()=>daySheet(d)});
 }
 
-/* ---------- extras picker (abrigo / accesorio) ---------- */
+/* ---------- capas (otra parte de arriba o abrigo, de dentro a fuera) ---------- */
+export function layerPool(){const f=S.flow,L=layersOf(f);return S.items.filter(i=>(i.cat==='outer'||i.cat==='top')&&i.id!==f.top&&!L.includes(i.id)&&available(i))}
+export function layerSheet(){
+  const f=S.flow,base=get(f.top),pool=layerPool(),outs=pool.filter(i=>i.cat==='outer'),tops=pool.filter(i=>i.cat==='top');
+  const good=base?outs.filter(i=>compatible(i,base)):outs,other=outs.filter(i=>!good.includes(i));
+  let h=sheetHead('Añadir capa')+`<div class="sh-body gut"><p class="sub" style="margin:0">Va encima de lo que ya llevas${layersOf(f).length?'; una parte de arriba entra por debajo de los abrigos':''}.</p>`;
+  if(outs.length)h+=`<p class="label" style="margin:8px 0 0">${CATS.outer.plural}${base&&good.length?` · primero los que combinan con ${esc(base.name)}`:''}</p><div class="grid">${[...good,...other].map(i=>tile(i,{act:'addLayer',dim:other.includes(i)})).join('')}</div>`;
+  if(tops.length)h+=`<p class="label" style="margin:8px 0 0">Otra parte de arriba (jersey, camisa abierta…)</p><div class="grid">${tops.map(i=>tile(i,{act:'addLayer'})).join('')}</div>`;
+  h+=`</div>`;
+  openSheet(h,{tall:true});
+}
+
+/* ---------- extras picker (accesorio) ---------- */
 export function pickerSheet(cat){
   const f=S.flow,base=cat==='outer'?get(f.top):null;
   const pool=S.items.filter(i=>i.cat===cat&&available(i));

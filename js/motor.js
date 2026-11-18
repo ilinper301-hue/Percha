@@ -1,10 +1,10 @@
 /* Percha · motor.js — Estadísticas, compatibilidad, combinaciones y generación de la semana. */
-import {BASE_BOTTOMS,BOLD,BS,NEUTRAL,SLOTS,TB,addDays,diffDays,inList,pairKey,parseD,todayISO} from './datos.js';
+import {BASE_BOTTOMS,BOLD,BS,NEUTRAL,TB,outfitIds,addDays,diffDays,inList,pairKey,parseD,todayISO} from './datos.js';
 import {S,del,savePlan} from './almacen.js';
 
 export let ST={};
 /* ---------- logic ---------- */
-export function computeStats(){ST={};for(const it of S.items)ST[it.id]={uses:0,last:null};for(const w of S.wears)for(const k of SLOTS){const id=w[k];if(id&&ST[id]){ST[id].uses++;if(!ST[id].last||w.date>ST[id].last)ST[id].last=w.date}}}
+export function computeStats(){ST={};for(const it of S.items)ST[it.id]={uses:0,last:null};for(const w of S.wears)for(const id of outfitIds(w)){if(ST[id]){ST[id].uses++;if(!ST[id].last||w.date>ST[id].last)ST[id].last=w.date}}}
 export const usesOf=id=>ST[id]?ST[id].uses:0;
 export const lastOf=id=>ST[id]?ST[id].last:null;
 export function currentSeason(){const s=S.settings.season;if(s!=='auto')return s;const m=new Date().getMonth();if([5,6,7,8].includes(m))return 'warm';if([10,11,0,1,2].includes(m))return 'cold';return 'all'}
@@ -37,7 +37,7 @@ export function forgottenList(){const N=S.settings.forgotten,t=todayISO();return
 export const hasDemo=()=>S.items.some(i=>i.demo);
 
 export function weekDates(){const t=todayISO(),dow=(parseD(t).getDay()+6)%7,mon=addDays(t,-dow+S.week*7);return [...Array(7)].map((_,i)=>addDays(mon,i))}
-export function usageAround(d,N){const m={};const note=(o,dd)=>{if(dd===d)return;const dist=Math.abs(diffDays(d,dd));if(dist>N)return;for(const k of SLOTS){const id=o[k];if(id&&(m[id]===undefined||dist<m[id]))m[id]=dist}};for(const w of S.wears)note(w,w.date);for(const [dd,p] of Object.entries(S.plan))if(p.top&&!S.wears.some(w=>w.date===dd))note(p,dd);return m}
+export function usageAround(d,N){const m={};const note=(o,dd)=>{if(dd===d)return;const dist=Math.abs(diffDays(d,dd));if(dist>N)return;for(const id of outfitIds(o)){if((m[id]===undefined||dist<m[id]))m[id]=dist}};for(const w of S.wears)note(w,w.date);for(const [dd,p] of Object.entries(S.plan))if(p.top&&!S.wears.some(w=>w.date===dd))note(p,dd);return m}
 export function generate(dates){
   const N=S.settings.noRepeat,t=todayISO();let fails=0;
   const maxU=Math.max(1,...Object.values(ST).map(s=>s.uses));
