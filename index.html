@@ -949,13 +949,41 @@ async function exportData(share){
   setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   S.settings.lastExport=todayISO();saveSettings();toast('Copia exportada a Descargas');refreshSheet();if(!$('.scrim'))render();
 }
-async function applyImport(data){
+/* checks and cleans a backup in memory; throws before anything is touched */
+function cleanBackup(data){
+  const isStr=v=>typeof v==='string',isObj=v=>v&&typeof v==='object'&&!Array.isArray(v),isDate=v=>isStr(v)&&/^\d{4}-\d{2}-\d{2}$/.test(v);
+  if(!isObj(data)||data.app!=='percha'||!Array.isArray(data.items))throw new Error('estructura');
+  const ids=new Set(),items=[];
+  for(const r of data.items){
+    if(!isObj(r)||!isStr(r.id)||!r.id||ids.has(r.id)||!CATS[r.cat])continue;
+    ids.add(r.id);
+    const {thumb,...it}=r;
+    const price=Number(it.price);
+    items.push({...it,name:isStr(it.name)?it.name:CATS[it.cat].label,color:isStr(it.color)?it.color:'',
+      styles:Array.isArray(it.styles)?it.styles.filter(x=>STYLES[x]):['casual'],season:SEASONS[it.season]?it.season:'all',
+      price:price>0?price:null,wild:!!it.wild,laundry:!!it.laundry,added:isDate(it.added)?it.added:todayISO(),fit:it.fit==='cover'?'cover':'contain',
+      img:it.img instanceof Blob?it.img:isStr(it.img)&&it.img.startsWith('data:')?dataURLToBlob(it.img):null});
+  }
+  if(!items.length&&data.items.length)throw new Error('ninguna prenda válida');
+  for(const it of items)if(!it.img){it.img=svgBlob(garmentSVG(defaultKind[it.cat],it.color));it.illus=true}
+  const wears=(Array.isArray(data.wears)?data.wears:[]).filter(w=>isObj(w)&&isStr(w.id)&&isDate(w.date)).map(w=>{const o={id:w.id,date:w.date};for(const k of SLOTS)o[k]=ids.has(w[k])?w[k]:null;return o});
+  const pairs=(Array.isArray(data.pairs)?data.pairs:[]).filter(k=>isStr(k)&&k.split('|').every(x=>ids.has(x)));
+  const blocks=(Array.isArray(data.blocks)?data.blocks:[]).filter(k=>isStr(k)&&k.split('|').every(x=>ids.has(x)));
+  const rules=(Array.isArray(data.rules)?data.rules:[]).filter(r=>Array.isArray(r)&&r.length===2&&r.every(isStr));
+  const plan={};if(isObj(data.plan))for(const [d,v] of Object.entries(data.plan))if(isDate(d)&&isObj(v)){const o={style:STYLES[v.style]?v.style:undefined};for(const k of SLOTS)if(ids.has(v[k]))o[k]=v[k];plan[d]=o}
+  const st=isObj(data.settings)?data.settings:{},settings={};
+  for(const k of Object.keys(S.settings)){if(!(k in st))continue;if(k==='lastExport'){if(st[k]===null||isDate(st[k]))settings[k]=st[k]}else if(typeof st[k]===typeof S.settings[k])settings[k]=st[k]}
+  if(!['auto','light','dark'].includes(settings.theme))delete settings.theme;
+  return {items,wears,pairs,blocks,rules,plan,settings};
+}
+async function applyImport(raw){
+  const data=cleanBackup(raw); /* if anything is wrong this throws and the current data stays */
   for(const s of['items','wears','kv'])await clearStore(s);
   for(const v of URLS.values())URL.revokeObjectURL(v.url);URLS.clear();
-  S.items=data.items.map(({thumb,...it})=>({...it,img:it.img instanceof Blob?it.img:typeof it.img==='string'&&it.img.startsWith('data:')?dataURLToBlob(it.img):svgBlob(garmentSVG(defaultKind[it.cat],it.color))}));
-  S.pairs=new Set(data.pairs||[]);S.blocks=new Set(data.blocks||[]);S.rules=data.rules||[];S.wears=data.wears||[];S.plan=data.plan||{};S.settings={...S.settings,...(data.settings||{})};
+  S.items=data.items;S.pairs=new Set(data.pairs);S.blocks=new Set(data.blocks);S.rules=data.rules;S.wears=data.wears;S.plan=data.plan;S.settings={...S.settings,...data.settings};
   for(const it of S.items)await put('items',it);for(const w of S.wears)await put('wears',w);
   savePairs();saveRules();savePlan();saveSettings();saveKV('seeded',true);computeStats();
+  applyTheme(S.settings.theme||'auto');
   ensureThumbs();
 }
 
@@ -1069,7 +1097,7 @@ document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.id==='f-photo'){const f=t.files&&t.files[0];t.value='';if(f&&D)loadPhoto(f);return}
-  if(t.id==='imp-file'){const f=t.files&&t.files[0];t.value='';if(!f)return;try{pendingImport=await readBackup(f);refreshSheet()}catch(err){console.warn(err);toast('Ese archivo no es una copia de Percha')}return}
+  if(t.id==='imp-file'){const f=t.files&&t.files[0];t.value='';if(!f)return;try{const d=await readBackup(f);cleanBackup(d);pendingImport=d;refreshSheet()}catch(err){console.warn(err);toast('Ese archivo no es una copia de Percha')}return}
   if(t.dataset.change==='armSort'){S.armSort=t.value;render()}
   if(t.dataset.change==='dataSort'){S.dataSort=t.value;render()}
 });
