@@ -250,6 +250,14 @@ details.others .hint{margin:8px 0 14px}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.12);vertical-align:-1px}
 .toggle{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .toggle p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.more{margin-top:4px;border-top:1px solid var(--line,rgba(0,0,0,.1))}
+.more>summary{list-style:none;cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:500;padding:6px 0}
+.more>summary::-webkit-details-marker{display:none}
+.more>summary span{font-weight:400;font-size:13px;color:var(--muted)}
+.more>summary::after{content:'›';order:3;font-size:20px;color:var(--muted);transition:transform .2s}
+.more[open]>summary::after{transform:rotate(90deg)}
+.more[open]>summary span{display:none}
+.more[open]>summary{margin-bottom:12px}
 .switch{appearance:none;width:46px;height:28px;border-radius:999px;background:var(--line);border:0;position:relative;cursor:pointer;flex:none;transition:background .15s}
 .switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .18s}
 .switch[aria-checked="true"]{background:var(--accent)}
@@ -733,10 +741,11 @@ function drawEdit(){
   h+=`<div class="field"><label class="label" for="f-name">Nombre</label><input class="input" id="f-name" data-input="name" value="${esc(D.name)}" placeholder="Camiseta blanca de algodón" autocomplete="off"></div>`;
   h+=`<div class="field"><span class="label">Categoría</span>${segs('cat',CAT_ORDER.map(c=>[c,CATS[c].label]))}</div>`;
   h+=`<div class="field"><span class="label">Color <span id="color-name" style="text-transform:none;letter-spacing:0;color:var(--fg)">${D.color?'· '+cap(D.color)+(D.colorAuto?' (sugerido)':''):''}</span></span><div class="sw">${COLORS.map(([n])=>`<button type="button" class="swc${D.color===n?' on':''}" data-act="color" data-v="${n}" style="background:${swatchBg(n)}" aria-label="${n}"></button>`).join('')}</div><p class="hint">Con el color, Percha te sugiere con qué combina. Se propone según la foto; corrígelo si no acierta.</p></div>`;
+  h+=`<details class="more" id="f-more"${D.more||!D.isNew?' open':''}><summary>Más detalles <span>estilo, temporada, precio, comodín</span></summary>`;
   h+=`<div class="field"><span class="label">Estilo</span>${segs('styles',Object.entries(STYLES),true)}</div>`;
   h+=`<div class="field"><span class="label">Temporada</span>${segs('season',Object.entries(SEASONS))}</div>`;
   h+=`<div class="field"><label class="label" for="f-price">Precio <span style="text-transform:none;letter-spacing:0">(opcional, para el coste por uso)</span></label><input class="input" id="f-price" data-input="price" inputmode="decimal" value="${D.price??''}" placeholder="25"></div>`;
-  h+=`<div class="toggle"><div><b style="font-weight:500">Comodín</b><p>Combina con todo, sin tener que marcarlo una a una.</p></div><button type="button" class="switch" role="switch" aria-checked="${!!D.wild}" data-act="wildToggle" aria-label="Comodín"></button></div>`;
+  h+=`<div class="toggle"><div><b style="font-weight:500">Comodín</b><p>Combina con todo, sin tener que marcarlo una a una.</p></div><button type="button" class="switch" role="switch" aria-checked="${!!D.wild}" data-act="wildToggle" aria-label="Comodín"></button></div></details>`;
   h+=`</div>`;
   openSheet(h,{tall:true});
 }
@@ -1124,6 +1133,7 @@ const A={
   wipeDo:async()=>{for(const s of['items','wears'])await clearStore(s);await clearStore('kv');await saveKV('seeded',true);S.items=[];S.pairs=new Set();S.blocks=new Set();S.rules=[];S.wears=[];S.plan={};resetFlow();computeStats();confirmWipe=false;closeSheet();toast('Datos borrados')}
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=A[el.dataset.act];if(f)f(el.dataset,el,e)});
+document.addEventListener('toggle',e=>{if(e.target.id==='f-more'&&D)D.more=e.target.open},true);
 document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.input;if(!k||!D)return;if(k==='tol'){D.tol=+e.target.value;clearTimeout(D._t);D._t=setTimeout(processPhoto,140)}else D[k]=e.target.value});
 document.addEventListener('change',async e=>{
   const t=e.target;
