@@ -21,6 +21,8 @@ Orden recomendado: fase 1 → 2 → 3 → 4 → 5. Dentro de cada fase, de arrib
 | 5.4 Capas en tarjeta, historial y generar semana | Sonnet | Medio |
 | 5.5 Lista de deseos (alta y lista) | Sonnet | Medio |
 | 5.6 Deseos: "qué combinaría" y paso a prenda | Sonnet | Medio |
+| 6.1 Varios outfits en un día (datos y Hoy) | Sonnet | Alto |
+| 6.2 Registrar días pasados desde Semana | Sonnet | Medio |
 
 ---
 
@@ -68,9 +70,16 @@ Orden recomendado: fase 1 → 2 → 3 → 4 → 5. Dentro de cada fase, de arrib
 - [x] **5.5 Lista de deseos.** Almacén `wishes` (nombre, categoría, color, estilo, precio estimado opcional, nota, foto opcional). Hoja "Deseos" accesible desde Armario con alta, edición y borrado. En la copia de seguridad igual que `favs`.
 - [x] **5.6 Deseos que completan combinaciones.** En cada deseo, mostrar con cuántas prendas del armario combinaría según la guía de color (`compatReason`) y qué outfits nuevos permitiría (`combos`); botón "Ya lo tengo" que lo convierte en prenda (abre `editSheet` con los datos) y lo quita de la lista.
 
+## Fase 6 · Varios outfits por día y días pasados
+
+Hoy `recordWear` sustituye el registro del mismo día (`S.wears.find(w=>w.date===date)`), `Hoy`, Semana y `undoToday` asumen uno solo. `S.wears` ya es una lista, así que la copia de seguridad y las estadísticas no cambian de formato. El plan (`S.plan`) sigue siendo un outfit por día.
+
+- [ ] **6.1 Varios outfits en un día.** Helper `wearsOn(date)` (lista ordenada por hora de alta; añadir `at` opcional a cada registro, sin romper copias antiguas). `recordWear` añade en vez de sustituir; si es el mismo conjunto exacto, no duplicar. Hoy muestra todos los de hoy (tarjetas apiladas, cada una con "Quitar") y un botón "Añadir otro outfit" que abre el flujo; `undoToday` y `favWear` actúan sobre un registro concreto. Semana e historial muestran los de cada día (miniaturas de todos, sin romper la fila). Estadísticas ya cuentan cada registro (`computeStats`, `usageAround`, repetición): comprobar que `generate` no penaliza de más.
+- [ ] **6.2 Registrar días pasados.** En la hoja del día (`daySheet`) de un día pasado o de hoy, botón "Registrar outfit" que arranque el flujo con esa fecha como destino (`confirmOutfit` ya distingue hoy / otro día: añadir el caso pasado, que guarda con `recordWear(o,fecha)` en vez de bloquear el plan). Permitir quitar registros del día. Probar que Datos (semanas, categorías, historial) cuenta los registrados a posteriori.
+
 ## Ideas para más adelante (no prioritarias)
 
-- Varios outfits por día o registrar días pasados desde Semana.
+- Varios outfits por día también en el plan (hoy un solo outfit planificado por día).
 
 ---
 
@@ -107,3 +116,4 @@ Orden recomendado: fase 1 → 2 → 3 → 4 → 5. Dentro de cada fase, de arrib
 | 18-11-2026 | 5.4 Capas en la interfaz | Con varias capas, la tarjeta de outfit las nombra «Capa 1», «Capa 2»… (con una sola sigue «Abrigo»/«Capa»); las miniaturas de capas ya salían en el lateral, Semana, historial y Datos gracias a `outfitIds`. `generate` añade un abrigo (`layers:[id]`) cuando la temporada es fría: solo abrigos disponibles que combinan con la prenda de arriba, respeta el estilo del día, prefiere los de temporada fría y los menos usados/recientes. Con calor o entretiempo no añade capa. Probado en Chrome móvil: semana generada con abrigo cada día, hoja de día con capa, sin errores. Caché `percha-v27`. |
 | 18-11-2026 | 5.5 Lista de deseos | Enlace «Deseos (n)» arriba del Armario que abre `wishSheet`: lista con miniatura, categoría, color, precio y nota; «Añadir» y tocar un deseo abren `wishEdit` (foto opcional a 480 px, nombre, categoría, color, estilos, precio estimado, nota) con Guardar/Cancelar y «Quitar de deseos» con «Deshacer». Se guardan en `S.wishes` dentro de `kv` (clave `wishes`), sin subir la versión de IndexedDB; la foto es un Blob en el propio deseo. Copia: campo opcional `wishes` en `data.json` y fotos en `fotos/deseo-<id>.<ext>` (`exportData`, `readBackup`, `cleanBackup` valida y limpia, `applyImport`); copias antiguas sin él se importan igual y `wipeDo` los borra. Probado en Chrome móvil: alta con foto, edición, borrado y deshacer, recarga, exportar ZIP, importar ZIP y copia v1 con deseos sucios, sin errores. Caché `percha-v28`. |
 | 18-11-2026 | 5.6 Deseos que completan combinaciones | `wishFit` (`motor.js`) trata el deseo como una prenda virtual y usa `compatible`/`outfitOK`: cuenta las prendas del armario que combinan con él y los outfits nuevos que permitiría (con abrigo, los outfits actuales a los que se podría añadir). La lista de deseos muestra «Combina con N · M outfits nuevos»; la hoja de edición tiene el panel «Con tu armario» (miniaturas y ejemplos, se actualiza al cambiar categoría, color o estilo) y el botón verde «Ya lo tengo»: abre `drawEdit` con los datos y la foto del deseo (`D.fromWish`) y, al guardar, lo quita de la lista (Cancelar vuelve a Deseos). Sin color o accesorio se explica por qué no hay cálculo. Probado en Chrome móvil: alta, cálculo, conversión a prenda y borrado del deseo, sin errores. Caché `percha-v29`. **Plan terminado.** |
+| 18-11-2026 | Plan fase 6 | Añadidos 6.1 (varios outfits por día) y 6.2 (registrar días pasados) con modelo y esfuerzo recomendados. Nada implementado todavía. |
