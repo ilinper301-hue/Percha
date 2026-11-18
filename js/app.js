@@ -18,7 +18,8 @@ export async function recordWear(o,date){
 }
 export async function deleteItem(id){
   S.items=S.items.filter(i=>i.id!==id);await del('items',id);
-  for(const k of [...S.pairs]){const [a,b]=k.split('|');if(a===id||b===id)S.pairs.delete(k)}savePairs();
+  for(const k of [...S.pairs]){const [a,b]=k.split('|');if(a===id||b===id)S.pairs.delete(k)}
+  for(const k of [...S.blocks]){const [a,b]=k.split('|');if(a===id||b===id)S.blocks.delete(k)}savePairs();
   for(const [d,p] of Object.entries(S.plan))if(SLOTS.some(k=>p[k]===id))S.plan[d]={style:p.style};savePlan();
   dropURLs(id);
   for(const k of SLOTS)if(S.flow[k]===id)resetFlow(true);
@@ -32,7 +33,8 @@ export const A={
     const ids=new Set(S.items.filter(i=>i.demo).map(i=>i.id));
     for(const id of ids)await del('items',id);
     S.items=S.items.filter(i=>!ids.has(i.id));
-    for(const k of [...S.pairs]){const [a,b]=k.split('|');if(ids.has(a)||ids.has(b))S.pairs.delete(k)}savePairs();
+    for(const k of [...S.pairs]){const [a,b]=k.split('|');if(ids.has(a)||ids.has(b))S.pairs.delete(k)}
+    for(const k of [...S.blocks]){const [a,b]=k.split('|');if(ids.has(a)||ids.has(b))S.blocks.delete(k)}savePairs();
     for(const w of S.wears.filter(w=>SLOTS.some(k=>ids.has(w[k]))))await del('wears',w.id);
     S.wears=S.wears.filter(w=>!SLOTS.some(k=>ids.has(w[k])));
     S.plan={};savePlan();resetFlow();computeStats();
@@ -109,7 +111,7 @@ export const A={
   importCancel:()=>{pendingImport=null;refreshSheet()},
   wipeAsk:()=>{confirmWipe=true;refreshSheet()},
   wipeCancel:()=>{confirmWipe=false;refreshSheet()},
-  wipeDo:async()=>{for(const s of['items','wears'])await clearStore(s);await clearStore('kv');await saveKV('seeded',true);S.items=[];S.pairs=new Set();S.blocks=new Set();S.rules=[];S.wears=[];S.plan={};resetFlow();computeStats();confirmWipe=false;closeSheet();toast('Datos borrados')}
+  wipeDo:async()=>{for(const s of['items','wears'])await clearStore(s);await clearStore('kv');await saveKV('seeded',true);Object.assign(S.settings,{season:'auto',noRepeat:3,forgotten:21,lastExport:null,suggest:true,suggestLevel:'wide'});saveSettings();/* el tema se conserva a propósito */S.items=[];S.pairs=new Set();S.blocks=new Set();S.rules=[];S.wears=[];S.plan={};resetFlow();computeStats();confirmWipe=false;closeSheet();toast('Datos borrados')}
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=A[el.dataset.act];if(f)f(el.dataset,el,e)});
 document.addEventListener('toggle',e=>{if(e.target.id==='f-more'&&D)D.more=e.target.open},true);
@@ -138,6 +140,8 @@ export async function boot(){
   if(S.noStore)toast('Este navegador no permite guardar datos. Lo que hagas se perderá al cerrar.');
 }
 boot();
+let lastDay=todayISO();
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible')return;const t=todayISO();if(t===lastDay)return;lastDay=t;computeStats();if(!$('.scrim'))render()});
 if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').then(reg=>{
   const ask=w=>{if(w&&navigator.serviceWorker.controller)toast('Hay una versión nueva',{label:'Recargar',sticky:true,fn:()=>w.postMessage('SKIP_WAITING')})};
   ask(reg.waiting);
