@@ -1,7 +1,7 @@
 /* Percha · vistas.js — Tema, toast, hojas y pantallas (Hoy, Armario, Semana, Datos, fichas, ajustes). */
 import {$,BS,CATS,addDays,favKey,layersOf,outfitIds,CAT_ORDER,COLORS,DOW,DOWS,MON,MONS,SEASONS,STYLES,TB,ago,agoShort,cap,defaultKind,diffDays,esc,euro,fmtLong,fmtShort,garmentSVG,ic,pairKey,parseD,related,svgBlob,svgDataURL,swatchBg,todayISO,uid} from './datos.js';
 import {CAN_SHARE,IMG_MAX,S,THUMB_MAX,blobToCanvas,del,dropURLs,encodeCanvas,get,imgTag,mini,put,savePairs,saveWishes,scaleCanvas,urlFor} from './almacen.js';
-import {available,byFresh,combos,compatReason,compatible,computeStats,currentSeason,forgottenList,hasDemo,lastOf,outfitOK,suggestScore,usesOf,weekDates} from './motor.js';
+import {available,byFresh,combos,compatReason,compatible,computeStats,currentSeason,forgottenList,hasDemo,lastOf,outfitOK,suggestScore,usesOf,weekDates,wishFit} from './motor.js';
 import {confirmWipe,deferredInstall,pendingImport} from './app.js';
 
 /* ---------- theme ---------- */
@@ -354,6 +354,7 @@ export async function saveItem(){
   if(old&&old.cat!==it.cat){for(const k of [...S.pairs]){const [a,b]=k.split('|');if(a===it.id||b===it.id)S.pairs.delete(k)}savePairs()}
   const i=S.items.findIndex(x=>x.id===it.id);if(i>=0)S.items[i]=it;else S.items.push(it);
   await put('items',it);
+  if(D.fromWish){S.wishes=S.wishes.filter(x=>x.id!==D.fromWish);dropURLs(D.fromWish);await saveWishes()}
   if(!old){try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}}
   computeStats();
   const isNew=D.isNew;
@@ -477,8 +478,25 @@ const wishImg=w=>w.img?urlFor(w):svgDataURL(garmentSVG(defaultKind[w.cat],w.colo
 export function wishSheet(){
   W=null;
   let h=sheetHead('Deseos','<button class="link" data-act="closeSheet">Cerrar</button>','<button class="link strong" data-act="wishNew">Añadir</button>')+`<div class="sh-body gut">`;
-  h+=S.wishes.length?`<p class="sub" style="margin:0 0 12px">Lo que te gustaría tener. Toca uno para editarlo.</p><div class="stack">`+S.wishes.map(w=>`<button class="favrow wish" data-act="wishOpen" data-id="${w.id}"><span class="mini"><img src="${wishImg(w)}" alt="" class="${w.img?'cover':''}"></span><span class="favn"><b>${esc(w.name)}</b><br><span style="color:var(--muted)">${CATS[w.cat].label}${w.color?' · '+cap(w.color):''}${w.price?' · '+euro(w.price):''}</span>${w.note?`<br><span style="color:var(--muted)">${esc(w.note)}</span>`:''}</span></button>`).join('')+`</div>`:`<p class="hint">Aún no tienes deseos. Pulsa «Añadir» para apuntar una prenda que te gustaría comprar.</p>`;
+  h+=S.wishes.length?`<p class="sub" style="margin:0 0 12px">Lo que te gustaría tener. Toca uno para editarlo.</p><div class="stack">`+S.wishes.map(w=>`<button class="favrow wish" data-act="wishOpen" data-id="${w.id}"><span class="mini"><img src="${wishImg(w)}" alt="" class="${w.img?'cover':''}"></span><span class="favn"><b>${esc(w.name)}</b><br><span style="color:var(--muted)">${CATS[w.cat].label}${w.color?' · '+cap(w.color):''}${w.price?' · '+euro(w.price):''}</span>${w.note?`<br><span style="color:var(--muted)">${esc(w.note)}</span>`:''}${(()=>{const f=wishFit(w);return f.nocolor||w.cat==='acc'?'':`<br><span style="color:var(--accent)">Combina con ${f.items.length} · ${f.n} ${f.n===1?'outfit nuevo':'outfits nuevos'}</span>`})()}</span></button>`).join('')+`</div>`:`<p class="hint">Aún no tienes deseos. Pulsa «Añadir» para apuntar una prenda que te gustaría comprar.</p>`;
   openSheet(h+`</div>`,{tall:true,refresh:wishSheet});
+}
+export function wishFitHTML(w){
+  const f=wishFit(w);
+  if(f.nocolor)return `<p class="hint" style="margin:0">Elige un color para ver con qué prendas de tu armario combinaría.</p>`;
+  if(w.cat==='acc')return `<p class="hint" style="margin:0">Los accesorios no entran en las combinaciones.</p>`;
+  let h=`<p style="margin:0 0 8px;font-size:14px"><b>${f.items.length}</b> ${f.items.length===1?'prenda de tu armario combina':'prendas de tu armario combinan'} con él`+(w.cat!=='outer'||f.n?` · <b>${f.n}</b> ${f.n===1?'outfit nuevo':'outfits nuevos'}`:'')+`</p>`;
+  if(f.items.length)h+=`<div class="thumbrow">${f.items.slice(0,8).map(i=>mini(i)).join('')}${f.items.length>8?`<span class="sub num">+${f.items.length-8}</span>`:''}</div>`;
+  if(f.ex.length)h+=`<p class="hint" style="margin:10px 0 6px">Por ejemplo</p>`+f.ex.map(o=>`<div class="thumbrow" style="margin-bottom:6px">${o.map(i=>mini(i)).join('')}</div>`).join('');
+  if(w.cat!=='outer'&&!f.n)h+=`<p class="hint" style="margin:8px 0 0">Todavía no completaría ningún outfit con tus prendas actuales.</p>`;
+  return h;
+}
+export function wishFitRefresh(){const e=$('#w-fit');if(e&&W)e.innerHTML=wishFitHTML(W)}
+export function wishOwn(){
+  if(!W)return;const w=W;if(w._pu)URL.revokeObjectURL(w._pu);
+  D={id:uid(),name:w.name,cat:w.cat,color:w.color,styles:w.styles.length?[...w.styles]:['casual'],season:'all',price:w.price??'',wild:false,laundry:false,hasPhoto:!!w.img,src:null,removeBg:false,tol:34,isNew:true,fit:'cover',fromWish:w.id};
+  if(w.img){D.blob=w.img;D.thumb=w.img;D.newImg=true}
+  W=null;drawEdit();
 }
 export function wishEdit(id){
   const w=S.wishes.find(x=>x.id===id);
@@ -493,8 +511,10 @@ export function drawWish(){
   h+=`<div class="field"><span class="label">Categoría</span>${segs('cat',CAT_ORDER.map(c=>[c,CATS[c].label]))}</div>`;
   h+=`<div class="field"><span class="label">Color <span id="w-color-name" style="text-transform:none;letter-spacing:0;color:var(--fg)">${W.color?'· '+cap(W.color):''}</span></span><div class="sw">${COLORS.map(([n])=>`<button type="button" class="swc${W.color===n?' on':''}" data-act="wcolor" data-v="${n}" style="background:${swatchBg(n)}" aria-label="${n}"></button>`).join('')}</div></div>`;
   h+=`<div class="field"><span class="label">Estilo</span>${segs('styles',Object.entries(STYLES),true)}</div>`;
+  h+=`<div class="field"><span class="label">Con tu armario</span><div id="w-fit">${wishFitHTML(W)}</div></div>`;
   h+=`<div class="field"><label class="label" for="w-price">Precio estimado <span style="text-transform:none;letter-spacing:0">(opcional)</span></label><input class="input" id="w-price" data-winput="price" inputmode="decimal" value="${W.price??''}" placeholder="40"></div>`;
   h+=`<div class="field"><label class="label" for="w-note">Nota <span style="text-transform:none;letter-spacing:0">(opcional)</span></label><input class="input" id="w-note" data-winput="note" value="${esc(W.note||'')}" placeholder="Tienda, enlace, talla…" autocomplete="off"></div>`;
+  if(!W.isNew)h+=`<button class="btn primary block" data-act="wishOwn" style="margin-top:8px">Ya lo tengo</button>`;
   if(!W.isNew)h+=`<button class="btn ghost block" data-act="wishDel" style="margin-top:8px">Quitar de deseos</button>`;
   openSheet(h+`</div>`,{tall:true});
 }
@@ -509,12 +529,14 @@ export function wishSet(f,v,el){
   else W[f]=v;
   W.changed=true;
   if(f==='cat'||f==='color'){const im=$('#w-prev');if(im&&!W.img)im.src=wishPrev()}
+  wishFitRefresh();
 }
 export function wishColorSync(c){
   if(!W)return;W.color=W.color===c?'':c;W.changed=true;
   document.querySelectorAll('.sheet .swc').forEach(b=>b.classList.toggle('on',b.dataset.v===W.color));
   const n=$('#w-color-name');if(n)n.textContent=W.color?'· '+cap(W.color):'';
   const im=$('#w-prev');if(im&&!W.img)im.src=wishPrev();
+  wishFitRefresh();
 }
 export async function wishPhoto(file){
   if(!W)return;const box=$('#w-box');box&&box.classList.add('busy');

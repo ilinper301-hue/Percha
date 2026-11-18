@@ -31,6 +31,17 @@ export function compatReason(a,b){if(!a||!b)return null;const k=pairKey(a.id,b.i
 export const compatible=(a,b)=>!!compatReason(a,b);
 export const byFresh=(a,b)=>(lastOf(a.id)||'0').localeCompare(lastOf(b.id)||'0')||a.name.localeCompare(b.name,'es');
 export function combos(filter){const f=filter||available;const T=S.items.filter(i=>i.cat==='top'&&f(i)),B=S.items.filter(i=>i.cat==='bottom'&&f(i)),H=S.items.filter(i=>i.cat==='shoes'&&f(i));const out=[];for(const t of T)for(const b of B){if(!compatible(t,b))continue;for(const h of H){if(!compatible(b,h))continue;if(!outfitOK(t,b,h))continue;out.push([t,b,h])}}return out}
+// Qué aportaría un deseo al armario: prendas con las que combina y outfits nuevos que permitiría.
+export function wishFit(w){
+  if(!w.color)return {nocolor:true,items:[],n:0,ex:[]};
+  const v={id:'wish:'+w.id,cat:w.cat,color:w.color,styles:w.styles||[],wild:false};
+  const items=S.items.filter(i=>i.cat!==w.cat&&['top','bottom','shoes','outer'].includes(i.cat)&&compatible(v,i));
+  const L={top:S.items.filter(i=>i.cat==='top'&&available(i)),bottom:S.items.filter(i=>i.cat==='bottom'&&available(i)),shoes:S.items.filter(i=>i.cat==='shoes'&&available(i))};
+  const out=[];
+  if(L[w.cat]){L[w.cat]=[v];for(const t of L.top)for(const b of L.bottom){if(!compatible(t,b))continue;for(const h of L.shoes){if(compatible(b,h)&&outfitOK(t,b,h))out.push([t,b,h])}}}
+  else if(w.cat==='outer'){for(const [t,b,h] of combos())if(compatible(t,v))out.push([t,b,h])}
+  return {items,n:out.length,ex:out.slice(0,3)};
+}
 // Reglas del outfit completo: un solo color llamativo y nada de las tres prendas del mismo color, salvo que tú lo hayas marcado.
 export function outfitOK(t,b,h){const mine=S.pairs.has(pairKey(t.id,b.id))&&S.pairs.has(pairKey(b.id,h.id));if(mine)return true;const cs=[t.color,b.color,h.color];if(cs.filter(c=>BOLD.has(c)).length>1)return false;if(cs[0]&&cs[0]===cs[1]&&cs[1]===cs[2]&&cs[0]!=='negro')return false;return true}
 export function forgottenList(){const N=S.settings.forgotten,t=todayISO();return S.items.map(it=>{const l=lastOf(it.id);const ref=l||it.added||t;return {it,days:diffDays(t,ref),never:!l}}).filter(x=>x.days>=N).sort((a,b)=>b.days-a.days)}

@@ -2,7 +2,7 @@
 import {$,SLOTS,diffDays,favKey,keyOutfit,outfitIds,pairKey,pickOutfit,todayISO,uid} from './datos.js';
 import {S,applyImport,cleanBackup,clearStore,db,del,dropURLs,ensureThumbs,exportData,get,getAll,idbOpen,migrateOutfits,put,readBackup,saveFavs,saveKV,saveWishes,savePairs,savePlan,saveRules,saveSettings,seedDemo,setDb} from './almacen.js';
 import {combos,compatible,computeStats,generate,lastOf,weekDates} from './motor.js';
-import {D,applyTheme,armBar,armBody,armList,closeSheet,compatSheet,daySheet,detailSheet,drawEdit,editSheet,favSheet,guideSheet,wishSheet,wishEdit,wishCancel,wishSave,wishDelete,wishSet,wishColorSync,wishPhoto,layerSheet,loadPhoto,pickerSheet,processPhoto,refreshSheet,render,saveItem,setD,settingsSheet,syncColor,toast,updatePreview} from './vistas.js';
+import {D,applyTheme,armBar,armBody,armList,closeSheet,compatSheet,daySheet,detailSheet,drawEdit,editSheet,favSheet,guideSheet,wishSheet,wishEdit,wishCancel,wishSave,wishDelete,wishOwn,wishSet,wishColorSync,wishPhoto,layerSheet,loadPhoto,pickerSheet,processPhoto,refreshSheet,render,saveItem,setD,settingsSheet,syncColor,toast,updatePreview} from './vistas.js';
 
 export let pendingImport=null,deferredInstall=null,confirmWipe=false;
 window.addEventListener('beforeinstallprompt',e=>{deferredInstall=e});window.addEventListener('appinstalled',()=>{deferredInstall=null;toast('Percha instalada')});
@@ -108,11 +108,12 @@ export const A={
   wishCancel:()=>wishCancel(),
   wishSave:()=>wishSave(),
   wishDel:()=>wishDelete(),
+  wishOwn:()=>wishOwn(),
   wseg:(d,el)=>wishSet(d.f,d.v,el),
   wcolor:d=>wishColorSync(d.v),
   detail:d=>detailSheet(d.id),
   editItem:d=>editSheet(d.id),
-  cancelEdit:()=>{const id=D&&!D.isNew?D.id:null;setD(null);id?detailSheet(id):closeSheet()},
+  cancelEdit:()=>{const id=D&&!D.isNew?D.id:null,fw=D&&D.fromWish;setD(null);fw?wishSheet():id?detailSheet(id):closeSheet()},
   saveItem:()=>saveItem(),
   seg:(d,el)=>{const g=el.closest('[data-field]'),field=g.dataset.field,multi=g.dataset.multi==='1';if(multi){const arr=D[field],i=arr.indexOf(d.v);if(i>=0)arr.splice(i,1);else arr.push(d.v);el.classList.toggle('on')}else{D[field]=d.v;g.querySelectorAll('.pill').forEach(p=>p.classList.toggle('on',p===el))}if(field==='cat')updatePreview()},
   color:(d,el)=>{D.color=D.color===d.v?'':d.v;D.colorAuto=false;syncColor();updatePreview()},
