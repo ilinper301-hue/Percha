@@ -96,7 +96,7 @@ export function flowHTML(target){
 export function summaryHTML(target,isToday){
   const f=S.flow;let h=outfitCard(f);
   const extras=['outer','acc'].filter(k=>S.items.some(i=>i.cat===k&&available(i)));
-  if(extras.length){h+=`<div class="stack" style="margin-top:12px">`+extras.map(k=>{const it=get(f[k]);return `<button class="extra" data-act="pickerExtra" data-cat="${k}">${it?mini(it)+`<span><b>${esc(it.name)}</b><br>${CATS[k].label} · cambiar</span>`:`${ic('plus',20)}<span>Añadir ${CATS[k].one} <span style="color:var(--faint)">(opcional)</span></span>`}</button>`}).join('')+`</div>`}
+  if(extras.length){h+=`<div class="stack" style="margin-top:12px">`+extras.map(k=>{const it=get(f[k]);return `<button class="extra" data-act="pickerExtra" data-cat="${k}">${it?mini(it)+`<span><b>${esc(it.name)}</b><br>${CATS[k].label} · cambiar</span>`:`${ic('plus',20)}<span>Añadir ${CATS[k].one} <span style="color:var(--muted)">(opcional)</span></span>`}</button>`}).join('')+`</div>`}
   h+=`<div class="actions"><button class="btn primary block" data-act="confirmOutfit">${isToday?'Me lo pongo hoy':'Guardar en el plan'}</button><button class="btn ghost block" data-act="flowReset">Empezar de nuevo</button></div>`;
   return h;
 }
