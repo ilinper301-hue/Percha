@@ -14,6 +14,8 @@ export const S={
 export const get=id=>id?S.items.find(i=>i.id===id):null;
 /* ---------- storage (IndexedDB, all on this phone) ---------- */
 export let db=null;
+/* registros de un día, por hora de alta (los antiguos, sin `at`, van primero en su orden) */
+export const wearsOn=d=>S.wears.filter(w=>w.date===d).sort((a,b)=>(a.at||'').localeCompare(b.at||''));
 export function idbOpen(){return new Promise((res,rej)=>{try{const r=indexedDB.open('percha',1);r.onupgradeneeded=()=>{const d=r.result;for(const s of['items','wears','kv'])if(!d.objectStoreNames.contains(s))d.createObjectStore(s,{keyPath:'id'})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
 export function tx(store,mode,fn){if(!db)return Promise.resolve();return new Promise((res,rej)=>{try{const t=db.transaction(store,mode);const out=fn(t.objectStore(store));t.oncomplete=()=>res(out&&out.result);t.onerror=()=>rej(t.error)}catch(e){rej(e)}})}
 export const warn=e=>{console.warn(e);if(!S._warned){S._warned=true;toast('No se pudo guardar en este navegador')}};
@@ -139,7 +141,7 @@ export function cleanBackup(data){
   if(!items.length&&data.items.length)throw new Error('ninguna prenda válida');
   for(const it of items)if(!it.img){it.img=svgBlob(garmentSVG(defaultKind[it.cat],it.color));it.illus=true}
   const ok=id=>ids.has(id);
-  const wears=(Array.isArray(data.wears)?data.wears:[]).filter(w=>isObj(w)&&isStr(w.id)&&isDate(w.date)).map(w=>({id:w.id,date:w.date,...pickOutfit(w,ok)}));
+  const wears=(Array.isArray(data.wears)?data.wears:[]).filter(w=>isObj(w)&&isStr(w.id)&&isDate(w.date)).map(w=>({id:w.id,date:w.date,...(isStr(w.at)&&!isNaN(Date.parse(w.at))?{at:w.at}:{}),...pickOutfit(w,ok)}));
   const pairs=(Array.isArray(data.pairs)?data.pairs:[]).filter(k=>isStr(k)&&k.split('|').every(x=>ids.has(x)));
   const blocks=(Array.isArray(data.blocks)?data.blocks:[]).filter(k=>isStr(k)&&k.split('|').every(x=>ids.has(x)));
   const rules=(Array.isArray(data.rules)?data.rules:[]).filter(r=>Array.isArray(r)&&r.length===2&&r.every(isStr));

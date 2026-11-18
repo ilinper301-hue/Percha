@@ -178,6 +178,10 @@ details.others .hint{margin:8px 0 14px}
 .day.past{opacity:.6}
 .dfits{display:flex;gap:6px;min-width:0;align-items:center}
 .dfits .mini{width:46px;height:46px}
+.dfits.multi{flex-wrap:wrap;gap:4px 10px}
+.dfits.multi .mini{width:30px;height:30px}
+.dfits .ofit{display:flex;gap:3px}
+.wearbox+.wearbox{margin-top:26px}
 .dfits .none{color:var(--muted);font-size:14px}
 .dmeta{display:flex;gap:6px;align-items:center;color:var(--muted)}
 .tag{font-size:11.5px;font-weight:500;padding:3px 8px;border-radius:999px;background:var(--sunk);color:var(--muted)}

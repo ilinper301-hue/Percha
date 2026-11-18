@@ -1,6 +1,6 @@
 /* Percha · app.js — Acciones, eventos y arranque. */
 import {$,SLOTS,diffDays,favKey,keyOutfit,outfitIds,pairKey,pickOutfit,todayISO,uid} from './datos.js';
-import {S,applyImport,cleanBackup,clearStore,db,del,dropURLs,ensureThumbs,exportData,get,getAll,idbOpen,migrateOutfits,put,readBackup,saveFavs,saveKV,saveWishes,savePairs,savePlan,saveRules,saveSettings,seedDemo,setDb} from './almacen.js';
+import {S,applyImport,cleanBackup,clearStore,db,del,dropURLs,ensureThumbs,exportData,get,getAll,idbOpen,migrateOutfits,put,readBackup,saveFavs,saveKV,saveWishes,savePairs,savePlan,saveRules,saveSettings,seedDemo,setDb,wearsOn} from './almacen.js';
 import {combos,compatible,computeStats,generate,lastOf,weekDates} from './motor.js';
 import {D,applyTheme,armBar,armBody,armList,closeSheet,compatSheet,daySheet,detailSheet,drawEdit,editSheet,favSheet,guideSheet,wishSheet,wishEdit,wishCancel,wishSave,wishDelete,wishOwn,wishSet,wishColorSync,wishPhoto,layerSheet,loadPhoto,pickerSheet,processPhoto,refreshSheet,render,saveItem,setD,settingsSheet,syncColor,toast,updatePreview} from './vistas.js';
 
@@ -12,12 +12,14 @@ export function resetFlow(keepTarget){const t=keepTarget?S.flow.target:null;S.fl
 const layersOfFlow=()=>Array.isArray(S.flow.layers)?S.flow.layers:[];
 export function scrollTop(){const v=$('#view');if(v)v.scrollTop=0}
 export async function addPair(a,b){S.pairs.add(pairKey(a,b));await savePairs()}
+/* añade un registro al día (puede haber varios); si ese mismo conjunto exacto ya está, no lo duplica: devuelve 'dup' o 'new' */
 export async function recordWear(o,date){
-  const prev=S.wears.find(w=>w.date===date);
-  const w={id:prev?prev.id:uid(),date,...pickOutfit(o)};
-  if(prev)S.wears[S.wears.indexOf(prev)]=w;else S.wears.push(w);
-  await put('wears',w);computeStats();return !!prev;
+  const oo=pickOutfit(o),key=favKey(oo);
+  if(wearsOn(date).some(w=>favKey(w)===key))return 'dup';
+  const w={id:uid(),date,at:new Date().toISOString(),...oo};
+  S.wears.push(w);await put('wears',w);computeStats();return 'new';
 }
+const wornMsg=r=>r==='dup'?'Ese outfit ya estaba registrado hoy':'Registrado. Buen día.';
 /* quita de los favoritos las prendas borradas; si falta una principal, el favorito se elimina */
 function dropFavs(ids){
   S.favs=S.favs.map(f=>({id:f.id,...pickOutfit(f,id=>!ids.has(id))})).filter(f=>f.top&&f.bottom&&f.shoes);saveFavs();
@@ -55,12 +57,13 @@ export const A={
     saveFavs();render();if($('.scrim'))refreshSheet();
   },
   favSheet:()=>favSheet(),
-  favWear:async d=>{const f=S.favs.find(x=>x.id===d.id);if(!f)return;const o=pickOutfit(f,id=>!!get(id));const t=todayISO();const was=await recordWear(o,t);if(S.plan[t])S.plan[t]={...S.plan[t],...o};savePlan();resetFlow();closeSheet();S.view='hoy';render();scrollTop();toast(was?'Outfit de hoy actualizado':'Registrado. Buen día.')},
+  favWear:async d=>{const f=S.favs.find(x=>x.id===d.id);if(!f)return;const o=pickOutfit(f,id=>!!get(id));const t=todayISO();const r=await recordWear(o,t);if(S.plan[t])S.plan[t]={...S.plan[t],...o};savePlan();resetFlow();closeSheet();S.view='hoy';render();scrollTop();toast(wornMsg(r))},
   favPlan:d=>{const f=S.favs.find(x=>x.id===d.id);if(!f||!d.date)return;const o=pickOutfit(f,id=>!!get(id));const t=todayISO();
     if(d.date===t){return A.favWear(d)}
     S.plan[d.date]={...o,style:(S.plan[d.date]||{}).style||'',locked:true};savePlan();closeSheet();S.view='semana';render();toast('Guardado y bloqueado en el plan')},
   // flow
   flowStart:()=>{resetFlow();S.flow.active=true;render();scrollTop()},
+  flowCancel:()=>{resetFlow();render();scrollTop()},
   flowReset:()=>{resetFlow(true);S.flow.active=true;render();scrollTop()},
   cancelTarget:()=>{resetFlow();S.view='semana';render()},
   goStep:d=>{const n=+d.step,ks=['top','bottom','shoes'];S.flow.seed=null;for(let i=n;i<3;i++)S.flow[ks[i]]=null;if(n===0)S.flow.layers=[];S.flow.step=n;S.flow.active=true;render()},
@@ -80,10 +83,10 @@ export const A={
   pickExtra:d=>{const it=get(d.id);const cat=it?it.cat:d.cat;S.flow[cat]=it?it.id:null;closeSheet()},
   confirmOutfit:async()=>{
     const f=S.flow,t=todayISO(),target=f.target||t,o=pickOutfit(f);
-    if(target===t){const was=await recordWear(o,t);if(S.plan[t])S.plan[t]={...S.plan[t],...o};savePlan();resetFlow();S.view='hoy';render();scrollTop();toast(was?'Outfit de hoy actualizado':'Registrado. Buen día.')}
+    if(target===t){const r=await recordWear(o,t);if(S.plan[t])S.plan[t]={...S.plan[t],...o};savePlan();resetFlow();S.view='hoy';render();scrollTop();toast(wornMsg(r))}
     else{S.plan[target]={...o,style:(S.plan[target]||{}).style||'',locked:true};savePlan();resetFlow();S.view='semana';render();toast('Guardado y bloqueado en el plan')}
   },
-  undoToday:async()=>{const w=S.wears.find(x=>x.date===todayISO());if(!w)return;S.wears=S.wears.filter(x=>x!==w);await del('wears',w.id);computeStats();render();toast('Registro de hoy borrado',{label:'Deshacer',fn:async()=>{S.wears.push(w);await put('wears',w);computeStats();render()}})},
+  undoToday:async d=>{const w=S.wears.find(x=>x.id===d.id);if(!w)return;S.wears=S.wears.filter(x=>x!==w);await del('wears',w.id);computeStats();render();toast('Outfit quitado de hoy',{label:'Deshacer',fn:async()=>{S.wears.push(w);await put('wears',w);computeStats();render()}})},
   wearPlan:async d=>{const p=S.plan[d.date];if(!p)return;await recordWear(p,d.date);if($('.scrim'))closeSheet();S.view='hoy';resetFlow();render();toast('Registrado. Buen día.')},
   // armario
   addItem:d=>editSheet(null,d.cat),

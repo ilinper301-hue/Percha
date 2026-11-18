@@ -1,6 +1,6 @@
 /* Percha · vistas.js — Tema, toast, hojas y pantallas (Hoy, Armario, Semana, Datos, fichas, ajustes). */
 import {$,BS,CATS,addDays,favKey,layersOf,outfitIds,CAT_ORDER,COLORS,DOW,DOWS,MON,MONS,SEASONS,STYLES,TB,ago,agoShort,cap,defaultKind,diffDays,esc,euro,fmtLong,fmtShort,garmentSVG,ic,pairKey,parseD,related,svgBlob,svgDataURL,swatchBg,todayISO,uid} from './datos.js';
-import {CAN_SHARE,IMG_MAX,S,THUMB_MAX,blobToCanvas,del,dropURLs,encodeCanvas,get,imgTag,mini,put,savePairs,saveWishes,scaleCanvas,urlFor} from './almacen.js';
+import {CAN_SHARE,IMG_MAX,S,THUMB_MAX,blobToCanvas,del,dropURLs,encodeCanvas,get,imgTag,mini,put,savePairs,saveWishes,scaleCanvas,urlFor,wearsOn} from './almacen.js';
 import {available,byFresh,combos,compatReason,compatible,computeStats,currentSeason,forgottenList,hasDemo,lastOf,outfitOK,suggestScore,usesOf,weekDates,wishFit} from './motor.js';
 import {confirmWipe,deferredInstall,pendingImport} from './app.js';
 
@@ -53,14 +53,15 @@ export function render(){
 export function demoBanner(){if(!hasDemo())return '';return `<div class="banner"><p>Estás viendo un armario de ejemplo.</p><button class="btn small primary" data-act="clearDemo">Empezar con el mío</button></div>`}
 
 /* ----- HOY ----- */
+const hora=at=>{const d=at?new Date(at):null;return d&&!isNaN(d)?String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'):''};
 export function viewHoy(){
   const f=S.flow,t=todayISO(),target=f.target||t;
-  const worn=S.wears.find(w=>w.date===t),plan=S.plan[t];
+  const worn=wearsOn(t),plan=S.plan[t];
   let h=demoBanner()+(S.favs.length?`<div class="row" style="justify-content:flex-end;margin-top:6px"><button class="link" data-act="favSheet">${ic('heart',16,1.8)} Favoritos (${S.favs.length})</button></div>`:'');
   if(!f.active&&!f.target){
-    if(worn){
-      return h+`<p class="eyebrow">${fmtLong(t)}</p><h1 class="h1">Hoy llevas</h1>${outfitCard(worn)}
-      <div class="actions"><button class="btn block" data-act="flowStart">Cambiar el outfit de hoy</button><button class="btn ghost block" data-act="undoToday">Borrar el registro de hoy</button></div>`;
+    if(worn.length){
+      const many=worn.length>1;
+      return h+`<p class="eyebrow">${fmtLong(t)}</p><h1 class="h1">${many?'Hoy llevas '+worn.length+' outfits':'Hoy llevas'}</h1>`+worn.map((w,i)=>`<section class="wearbox">${many?`<p class="label">Outfit ${i+1}${hora(w.at)?' · '+hora(w.at):''}</p>`:''}${outfitCard(w)}<div class="actions"><button class="btn ghost block" data-act="undoToday" data-id="${w.id}">Quitar ${many?'este outfit':'el outfit de hoy'}</button></div></section>`).join('')+`<div class="actions"><button class="btn block" data-act="flowStart">Añadir otro outfit</button></div>`;
     }
     if(plan&&plan.top&&get(plan.top)){
       return h+`<p class="eyebrow">${fmtLong(t)}</p><h1 class="h1">Tu plan para hoy</h1>${outfitCard(plan)}
@@ -70,10 +71,10 @@ export function viewHoy(){
   return h+flowHTML(target);
 }
 export function flowHTML(target){
-  const f=S.flow,step=f.step,t=todayISO(),isToday=target===t;
+  const f=S.flow,step=f.step,t=todayISO(),isToday=target===t,more=isToday&&wearsOn(t).length>0;
   const d=parseD(target);
-  let h=`<p class="eyebrow">${fmtLong(target)}${f.target?` · <button class="link" style="font-size:13px;padding:0 6px;margin:-14px 0" data-act="cancelTarget">Cancelar</button>`:''}</p>`;
-  h+=`<h1 class="h1">${isToday?'¿Qué te pones hoy?':'Outfit para el '+DOW[d.getDay()]+' '+d.getDate()}</h1>`;
+  let h=`<p class="eyebrow">${fmtLong(target)}${f.target?` · <button class="link" style="font-size:13px;padding:0 6px;margin:-14px 0" data-act="cancelTarget">Cancelar</button>`:isToday&&more?` · <button class="link" style="font-size:13px;padding:0 6px;margin:-14px 0" data-act="flowCancel">Cancelar</button>`:''}</p>`;
+  h+=`<h1 class="h1">${isToday?(more?'Otro outfit para hoy':'¿Qué te pones hoy?'):'Outfit para el '+DOW[d.getDay()]+' '+d.getDate()}</h1>`;
   h+=`<div class="prog" aria-label="Paso ${Math.min(step+1,3)} de 3">${[0,1,2].map(i=>`<i class="${i<step?'done':i===step?'cur':''}"></i>`).join('')}</div>`;
   const ks=['top','bottom','shoes'];
   const chips=ks.map((k,i)=>{const it=get(f[k]);if(!it||i>=step)return '';return `<button class="chip-it" data-act="goStep" data-step="${i}">${mini(it)}<span>${esc(it.name)}</span></button>`}).join('');
@@ -174,11 +175,12 @@ export function viewSemana(){
   h+=`<p class="sub" style="margin-top:6px">Combinaciones válidas, sin repetir prenda en ${S.settings.noRepeat} ${S.settings.noRepeat===1?'día':'días'} y dando prioridad a lo que menos usas. Toca un día para ajustarlo.</p>`;
   if(canGen)h+=`<button class="btn primary block" style="margin-top:16px" data-act="genWeek">${ic('refresh',18,1.8)}${ds.some(d=>d>=t&&S.plan[d]&&S.plan[d].top)?'Regenerar semana':'Generar semana'}</button>`;
   h+=`<ul class="days">`+ds.map(d=>{
-    const dd=parseD(d),past=d<t,p=S.plan[d]||{},w=S.wears.find(x=>x.date===d);
-    const o=w||(p.top?p:null);
-    const fits=o?outfitIds(o).map(get).filter(Boolean).map(it=>mini(it)).join(''):`<span class="none">${past?'Sin registro':'Sin plan'}</span>`;
-    const meta=[w?'<span class="tag acc">Llevado</span>':'',p.style&&!w?`<span class="tag">${STYLES[p.style]}</span>`:'',p.locked&&!w?ic('lock',16):''].join('');
-    return `<li><button class="day${d===t?' today':''}${past&&!w?' past':''}" data-act="daySheet" data-date="${d}"><span class="dname">${DOWS[dd.getDay()]}<b>${dd.getDate()}</b></span><span class="dfits">${fits}</span><span class="dmeta">${meta}</span></button></li>`;
+    const dd=parseD(d),past=d<t,p=S.plan[d]||{},ws=wearsOn(d),w=ws.length>0;
+    const o=w?null:(p.top?p:null);
+    const grp=x=>outfitIds(x).map(get).filter(Boolean).map(it=>mini(it)).join('');
+    const fits=ws.length>1?ws.map(x=>`<span class="ofit">${grp(x)}</span>`).join(''):ws.length?grp(ws[0]):o?grp(o):`<span class="none">${past?'Sin registro':'Sin plan'}</span>`;
+    const meta=[w?`<span class="tag acc">Llevado${ws.length>1?' ×'+ws.length:''}</span>`:'',p.style&&!w?`<span class="tag">${STYLES[p.style]}</span>`:'',p.locked&&!w?ic('lock',16):''].join('');
+    return `<li><button class="day${d===t?' today':''}${past&&!w?' past':''}" data-act="daySheet" data-date="${d}"><span class="dname">${DOWS[dd.getDay()]}<b>${dd.getDate()}</b></span><span class="dfits${ws.length>1?' multi':''}">${fits}</span><span class="dmeta">${meta}</span></button></li>`;
   }).join('')+`</ul>`;
   return h;
 }
@@ -239,7 +241,7 @@ export function viewDatos(){
   h+=top.length?top.map(([k,n])=>{const ids=k.split('|');return `<div class="combo">${ids.map(id=>mini(get(id))).join('')}<span class="hint" style="margin-left:4px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ids.map(id=>esc(get(id)?.name||'—')).join(' · ')}</span><span class="cnt">×${n}</span></div>`}).join(''):`<p class="hint">Aparecerán cuando repitas un mismo outfit.</p>`;
   h+=`</section>`;
   // history
-  const hist=[...S.wears].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,20);
+  const hist=[...S.wears].sort((a,b)=>b.date.localeCompare(a.date)||(b.at||'').localeCompare(a.at||'')).slice(0,20);
   h+=`<section class="sec"><h2 class="h2">Historial</h2>${hist.length?hist.map(w=>`<div class="hist"><span class="d">${fmtShort(w.date)}</span><span class="dfits">${outfitIds(w).map(get).filter(Boolean).map(it=>mini(it)).join('')}</span><button class="iconbtn" data-act="delWear" data-id="${w.id}" aria-label="Borrar registro">${ic('x',18)}</button></div>`).join(''):'<p class="hint">Todavía no has registrado ningún outfit.</p>'}</section>`;
   return h;
 }
@@ -391,9 +393,9 @@ export function compatSheet(id,fresh){
 
 /* ---------- week day sheet ---------- */
 export function daySheet(d){
-  const p=S.plan[d]||{},t=todayISO(),dd=parseD(d),w=S.wears.find(x=>x.date===d),past=d<t;
+  const p=S.plan[d]||{},t=todayISO(),dd=parseD(d),ws=wearsOn(d),w=ws.length>0,past=d<t;
   let h=sheetHead(cap(DOW[dd.getDay()])+' '+dd.getDate()+' de '+MON[dd.getMonth()])+`<div class="sh-body gut">`;
-  if(w){h+=`<div><span class="label">Llevado</span>${outfitCard(w)}</div>`}
+  if(w){h+=ws.map((x,i)=>`<div><span class="label">Llevado${ws.length>1?' · outfit '+(i+1):''}</span>${outfitCard(x)}</div>`).join('')}
   else if(p.top){h+=outfitCard(p)}
   else h+=`<div class="empty"><p>${past?'No registraste nada este día.':'Este día aún no tiene outfit.'}</p></div>`;
   if(!past&&!w){
