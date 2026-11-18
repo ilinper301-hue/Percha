@@ -4,6 +4,18 @@ Análisis hecho el 13-11-2026 sobre el commit `6d46a73`. Cada tarea tiene una ca
 
 Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abajo.
 
+## Modelo y esfuerzo recomendados
+
+| Tareas | Modelo | Esfuerzo |
+|---|---|---|
+| 1.4 Compartir la copia | Sonnet | Bajo |
+| 1.5 Importación robusta | Sonnet | Medio |
+| 2.1 a 2.3 Añadir prendas | Sonnet | Medio |
+| 3.1 Separar el código en archivos | Opus | Alto |
+| 3.2 a 3.4 Service worker, fuentes, fallos | Sonnet | Medio |
+| 4.1 a 4.4 y 4.6 Táctil, contraste, botones, cerrar hojas, outfit desde prenda | Sonnet | Bajo |
+| 4.5, 4.7 y 4.8 Buscar y filtrar, tarjeta de outfit, gráficas | Sonnet | Medio |
+
 ---
 
 ## Fase 1 · Fotos y copia de seguridad (lo más urgente)
@@ -57,3 +69,4 @@ Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abaj
 | 18-11-2026 | 1.1 Miniaturas | Foto a 800 px + `thumb` a 320 px (no 200: las rejillas de 2 columnas se ven borrosas en pantallas 3x). `thumb` en `mini()`, rejillas y "Hace tiempo"; foto grande en ficha y tarjeta de outfit. Migración al arrancar e importar (`ensureThumbs`). La copia no exporta miniaturas. Helpers `scaleCanvas`/`encodeCanvas` listos para 1.2. Caché `percha-v4`. |
 | 18-11-2026 | 1.2 WebP | `encodeCanvas` prueba `image/webp` (calidad 0,82) y, si el navegador no lo codifica (Safari), cae a PNG/JPEG y no lo vuelve a intentar. Mantiene la transparencia. En prueba: ≈8× menos que PNG sin fondo y ≈2× menos que JPEG. Las fotos ya guardadas no se recodifican. Caché `percha-v5`. |
 | 18-11-2026 | 1.3 Copia en ZIP | `percha-copia-AAAA-MM-DD.zip` con `data.json` (`version:2`, `img` = ruta) + `fotos/<id>.<ext>`. ZIP "store" propio (`makeZip`/`readZip`, con CRC comprobado). `readBackup` detecta ZIP o JSON antiguo (v1). Probado con `unzip -t` y restaurando ambos formatos. Caché `percha-v6`. |
+| 18-11-2026 | Modelo y esfuerzo | Añadida la tabla de modelo y esfuerzo recomendados por tarea. |

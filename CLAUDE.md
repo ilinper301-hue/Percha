@@ -9,7 +9,7 @@ Percha es una PWA de organización de armario (HTML/CSS/JS sin dependencias, dat
 3. Impleméntala, pruébala (al menos que la página cargue sin errores en consola y que la parte tocada funcione) y marca la casilla.
 4. Añade una línea al **Registro** de `MEJORAS.md`.
 5. Haz commit y push a `main` con un mensaje en español.
-6. Responde en pocas líneas: qué se hizo y cuál es la siguiente tarea.
+6. Responde en pocas líneas: qué se hizo y cuál es la siguiente tarea, con el modelo y esfuerzo recomendados (tabla de `MEJORAS.md`).
 
 Si una tarea es grande, divídela y completa solo una parte por sesión, dejándolo anotado en el Registro.
 
