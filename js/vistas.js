@@ -1,5 +1,5 @@
 /* Percha · vistas.js — Tema, toast, hojas y pantallas (Hoy, Armario, Semana, Datos, fichas, ajustes). */
-import {$,BS,CATS,addDays,CAT_ORDER,COLORS,DOW,DOWS,MON,MONS,SEASONS,SLOTS,STYLES,TB,ago,agoShort,cap,defaultKind,diffDays,esc,euro,fmtLong,fmtShort,garmentSVG,ic,pairKey,parseD,related,svgBlob,svgDataURL,swatchBg,todayISO,uid} from './datos.js';
+import {$,BS,CATS,addDays,favKey,CAT_ORDER,COLORS,DOW,DOWS,MON,MONS,SEASONS,SLOTS,STYLES,TB,ago,agoShort,cap,defaultKind,diffDays,esc,euro,fmtLong,fmtShort,garmentSVG,ic,pairKey,parseD,related,svgBlob,svgDataURL,swatchBg,todayISO,uid} from './datos.js';
 import {CAN_SHARE,IMG_MAX,S,THUMB_MAX,del,encodeCanvas,get,imgTag,mini,put,savePairs,scaleCanvas,urlFor} from './almacen.js';
 import {available,byFresh,combos,compatReason,compatible,computeStats,currentSeason,forgottenList,hasDemo,lastOf,outfitOK,suggestScore,usesOf,weekDates} from './motor.js';
 import {confirmWipe,deferredInstall,pendingImport} from './app.js';
@@ -56,7 +56,7 @@ export function demoBanner(){if(!hasDemo())return '';return `<div class="banner"
 export function viewHoy(){
   const f=S.flow,t=todayISO(),target=f.target||t;
   const worn=S.wears.find(w=>w.date===t),plan=S.plan[t];
-  let h=demoBanner();
+  let h=demoBanner()+(S.favs.length?`<div class="row" style="justify-content:flex-end;margin-top:6px"><button class="link" data-act="favSheet">${ic('heart',16,1.8)} Favoritos (${S.favs.length})</button></div>`:'');
   if(!f.active&&!f.target){
     if(worn){
       return h+`<p class="eyebrow">${fmtLong(t)}</p><h1 class="h1">Hoy llevas</h1>${outfitCard(worn)}
@@ -108,7 +108,9 @@ export function summaryHTML(target,isToday){
 export function outfitCard(o){
   const main=['top','bottom','shoes'].map(k=>get(o[k])).filter(Boolean),ex=['outer','acc'].map(k=>get(o[k])).filter(Boolean);
   if(!main.length&&!ex.length)return `<div class="empty"><p>Las prendas de este outfit ya no están en tu armario.</p></div>`;
-  return `<div class="lay"><div class="lay-main"><div class="lay-stack">${main.map(it=>`<button class="lay-i${it.cat==='shoes'?' k2':''}" data-act="detail" data-id="${it.id}" aria-label="${esc(it.name)}">${imgTag(it)}</button>`).join('')}</div>${ex.length?`<div class="lay-ex">${ex.map(it=>`<button class="lay-x" data-act="detail" data-id="${it.id}" aria-label="${esc(it.name)}">${imgTag(it)}</button>`).join('')}</div>`:''}</div>
+  const full=o.top&&o.bottom&&o.shoes&&get(o.top)&&get(o.bottom)&&get(o.shoes),fav=full&&S.favs.some(f=>favKey(f)===favKey(o));
+  const heart=full?`<button class="lay-fav${fav?' on':''}" data-act="favToggle" data-k="${favKey(o)}" aria-pressed="${fav}" aria-label="${fav?'Quitar de favoritos':'Guardar en favoritos'}">${ic('heart',22,1.8)}</button>`:'';
+  return `<div class="lay">${heart}<div class="lay-main"><div class="lay-stack">${main.map(it=>`<button class="lay-i${it.cat==='shoes'?' k2':''}" data-act="detail" data-id="${it.id}" aria-label="${esc(it.name)}">${imgTag(it)}</button>`).join('')}</div>${ex.length?`<div class="lay-ex">${ex.map(it=>`<button class="lay-x" data-act="detail" data-id="${it.id}" aria-label="${esc(it.name)}">${imgTag(it)}</button>`).join('')}</div>`:''}</div>
   <ul class="lay-names">${[...main,...ex].map(it=>`<li><span>${CATS[it.cat].label}</span><b>${esc(it.name)}</b></li>`).join('')}</ul></div>`;
 }
 export function tile(it,{act='detail',sel=false,dim=false,meta=true,extra='',check='',sug=false,sub=null,base=null}={}){
@@ -180,6 +182,14 @@ export function viewSemana(){
   return h;
 }
 /* ----- DATOS ----- */
+/* ----- favoritos ----- */
+export function favSheet(){
+  const list=S.favs.map(f=>({f,its:SLOTS.map(k=>get(f[k])).filter(Boolean)})).filter(x=>x.its.length>=3);
+  let h=sheetHead('Favoritos')+`<div class="sh-body gut">`;
+  h+=list.length?`<div class="stack">`+list.map(({f,its})=>`<div class="favrow"><button class="favfits" tabindex="-1" aria-hidden="true">${its.map(it=>mini(it)).join('')}</button><span class="favn">${its.map(it=>esc(it.name)).join(' · ')}</span><button class="iconbtn" data-act="favToggle" data-k="${favKey(f)}" aria-label="Quitar de favoritos">${ic('x',18)}</button></div>`).join('')+`</div>`:`<p class="hint">Aún no hay favoritos. Toca el corazón de un outfit para guardarlo.</p>`;
+  openSheet(h+`</div>`,{tall:true,refresh:favSheet});
+}
+
 /* ----- gráficas de Datos ----- */
 export function chartsHTML(){
   if(!S.items.length)return '';

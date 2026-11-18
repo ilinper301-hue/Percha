@@ -10,6 +10,7 @@ export const CATS={
 };
 export const CAT_ORDER=['top','bottom','shoes','outer','acc'];
 export const SLOTS=CAT_ORDER;
+export const favKey=o=>SLOTS.map(k=>o&&o[k]||'').join('|');
 export const RELS=[['top','bottom'],['bottom','shoes'],['top','outer']];
 export const related=c=>RELS.filter(r=>r.includes(c)).map(r=>r[0]===c?r[1]:r[0]);
 export const COLORS=[['negro','#1E1E1C'],['blanco','#F7F6F1'],['gris','#9C9B96'],['beige','#D9C8A7'],['marrón','#7B5338'],['azul marino','#25324F'],['azul','#4B74B2'],['celeste','#A8C6E4'],['verde','#4F7A52'],['oliva','#6F6B3A'],['rojo','#B3342C'],['granate','#6C2431'],['rosa','#E5A9B4'],['amarillo','#E2BF4D'],['naranja','#D7773B'],['morado','#6A4C88'],['estampado','conic']];
@@ -48,6 +49,7 @@ export const ICON={
   lock:'<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
   shuffle:'<path d="M16 4h4v4M4 20 20 4M20 16v4h-4M15 15l5 5M4 4l5 5"/>',
   refresh:'<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"/>',
+  heart:'<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
   x:'<path d="M6 6l12 12M18 6 6 18"/>',
   check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
   camera:'<path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z"/><circle cx="12" cy="12.5" r="3.5"/>'

@@ -1,8 +1,8 @@
 /* Percha · app.js — Acciones, eventos y arranque. */
-import {$,SLOTS,diffDays,pairKey,todayISO,uid} from './datos.js';
-import {S,applyImport,cleanBackup,clearStore,db,del,dropURLs,ensureThumbs,exportData,get,getAll,idbOpen,put,readBackup,saveKV,savePairs,savePlan,saveRules,saveSettings,seedDemo,setDb} from './almacen.js';
+import {$,SLOTS,diffDays,favKey,pairKey,todayISO,uid} from './datos.js';
+import {S,applyImport,cleanBackup,clearStore,db,del,dropURLs,ensureThumbs,exportData,get,getAll,idbOpen,put,readBackup,saveFavs,saveKV,savePairs,savePlan,saveRules,saveSettings,seedDemo,setDb} from './almacen.js';
 import {combos,compatible,computeStats,generate,lastOf,weekDates} from './motor.js';
-import {D,applyTheme,armBar,armBody,armList,closeSheet,compatSheet,daySheet,detailSheet,drawEdit,editSheet,guideSheet,loadPhoto,pickerSheet,processPhoto,refreshSheet,render,saveItem,setD,settingsSheet,syncColor,toast,updatePreview} from './vistas.js';
+import {D,applyTheme,armBar,armBody,armList,closeSheet,compatSheet,daySheet,detailSheet,drawEdit,editSheet,favSheet,guideSheet,loadPhoto,pickerSheet,processPhoto,refreshSheet,render,saveItem,setD,settingsSheet,syncColor,toast,updatePreview} from './vistas.js';
 
 export let pendingImport=null,deferredInstall=null,confirmWipe=false;
 window.addEventListener('beforeinstallprompt',e=>{deferredInstall=e});window.addEventListener('appinstalled',()=>{deferredInstall=null;toast('Percha instalada')});
@@ -17,11 +17,15 @@ export async function recordWear(o,date){
   if(prev)S.wears[S.wears.indexOf(prev)]=w;else S.wears.push(w);
   await put('wears',w);computeStats();return !!prev;
 }
+/* quita de los favoritos las prendas borradas; si falta una principal, el favorito se elimina */
+function dropFavs(ids){
+  S.favs=S.favs.map(f=>{const o={...f};for(const k of SLOTS)if(ids.has(o[k]))o[k]=null;return o}).filter(f=>f.top&&f.bottom&&f.shoes);saveFavs();
+}
 export async function deleteItem(id){
   S.items=S.items.filter(i=>i.id!==id);await del('items',id);
   for(const k of [...S.pairs]){const [a,b]=k.split('|');if(a===id||b===id)S.pairs.delete(k)}
   for(const k of [...S.blocks]){const [a,b]=k.split('|');if(a===id||b===id)S.blocks.delete(k)}savePairs();
-  for(const [d,p] of Object.entries(S.plan))if(SLOTS.some(k=>p[k]===id))S.plan[d]={style:p.style};savePlan();
+  for(const [d,p] of Object.entries(S.plan))if(SLOTS.some(k=>p[k]===id))S.plan[d]={style:p.style};savePlan();dropFavs(new Set([id]));
   dropURLs(id);
   for(const k of SLOTS)if(S.flow[k]===id)resetFlow(true);
   computeStats();
@@ -38,9 +42,17 @@ export const A={
     for(const k of [...S.blocks]){const [a,b]=k.split('|');if(ids.has(a)||ids.has(b))S.blocks.delete(k)}savePairs();
     for(const w of S.wears.filter(w=>SLOTS.some(k=>ids.has(w[k]))))await del('wears',w.id);
     S.wears=S.wears.filter(w=>!SLOTS.some(k=>ids.has(w[k])));
-    S.plan={};savePlan();resetFlow();computeStats();
+    S.plan={};savePlan();dropFavs(ids);resetFlow();computeStats();
     if($('.scrim'))closeSheet();S.view='armario';S.armCat='top';render();toast('Listo. Añade tu primera prenda con el botón +');
   },
+  favToggle:d=>{
+    const o={};SLOTS.forEach((k,i)=>{o[k]=d.k.split('|')[i]||null});const key=favKey(o);
+    const ex=S.favs.find(f=>favKey(f)===key);
+    if(ex){S.favs=S.favs.filter(f=>f!==ex);toast('Quitado de favoritos',{label:'Deshacer',fn:()=>{S.favs.push(ex);saveFavs();render();if($('.scrim'))refreshSheet()}})}
+    else{S.favs.push({id:uid(),...o});toast('Guardado en favoritos')}
+    saveFavs();render();if($('.scrim'))refreshSheet();
+  },
+  favSheet:()=>favSheet(),
   // flow
   flowStart:()=>{resetFlow();S.flow.active=true;render();scrollTop()},
   flowReset:()=>{resetFlow(true);S.flow.active=true;render();scrollTop()},
@@ -125,7 +137,7 @@ export const A={
   importCancel:()=>{pendingImport=null;refreshSheet()},
   wipeAsk:()=>{confirmWipe=true;refreshSheet()},
   wipeCancel:()=>{confirmWipe=false;refreshSheet()},
-  wipeDo:async()=>{for(const s of['items','wears'])await clearStore(s);await clearStore('kv');await saveKV('seeded',true);Object.assign(S.settings,{season:'auto',noRepeat:3,forgotten:21,lastExport:null,suggest:true,suggestLevel:'wide'});saveSettings();/* el tema se conserva a propósito */S.items=[];S.pairs=new Set();S.blocks=new Set();S.rules=[];S.wears=[];S.plan={};resetFlow();computeStats();confirmWipe=false;closeSheet();toast('Datos borrados')}
+  wipeDo:async()=>{for(const s of['items','wears'])await clearStore(s);await clearStore('kv');await saveKV('seeded',true);Object.assign(S.settings,{season:'auto',noRepeat:3,forgotten:21,lastExport:null,suggest:true,suggestLevel:'wide'});saveSettings();/* el tema se conserva a propósito */S.items=[];S.pairs=new Set();S.blocks=new Set();S.rules=[];S.wears=[];S.plan={};S.favs=[];resetFlow();computeStats();confirmWipe=false;closeSheet();toast('Datos borrados')}
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=A[el.dataset.act];if(f)f(el.dataset,el,e)});
 document.addEventListener('toggle',e=>{if(e.target.id==='f-more'&&D)D.more=e.target.open},true);
@@ -145,7 +157,7 @@ export async function boot(){
   if(db){
     S.items=(await getAll('items'))||[];S.wears=(await getAll('wears'))||[];
     const kv=Object.fromEntries(((await getAll('kv'))||[]).map(r=>[r.id,r.v]));
-    S.pairs=new Set(kv.pairs||[]);S.blocks=new Set(kv.blocks||[]);S.rules=kv.rules||[];S.plan=kv.plan||{};Object.assign(S.settings,kv.settings||{});seeded=!!kv.seeded;
+    S.pairs=new Set(kv.pairs||[]);S.blocks=new Set(kv.blocks||[]);S.rules=kv.rules||[];S.plan=kv.plan||{};S.favs=kv.favs||[];Object.assign(S.settings,kv.settings||{});seeded=!!kv.seeded;
   }
   if(!seeded)await seedDemo();
   applyTheme(S.settings.theme||'auto');

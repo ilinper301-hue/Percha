@@ -5,7 +5,7 @@ import {applyTheme,refreshSheet,render,toast} from './vistas.js';
 
 /* ---------- state ---------- */
 export const S={
-  items:[],pairs:new Set(),rules:[],wears:[],plan:{},
+  items:[],pairs:new Set(),rules:[],wears:[],plan:{},favs:[],
   blocks:new Set(),
   settings:{season:'auto',noRepeat:3,forgotten:21,lastExport:null,theme:'auto',suggest:true,suggestLevel:'wide'},
   view:'hoy',flow:{active:false,step:0,top:null,bottom:null,shoes:null,outer:null,acc:null,target:null},
@@ -25,6 +25,7 @@ export const saveKV=(k,v)=>put('kv',{id:k,v});
 export const savePairs=()=>{saveKV('blocks',[...S.blocks]);return saveKV('pairs',[...S.pairs])};
 export const saveRules=()=>saveKV('rules',S.rules);
 export const savePlan=()=>saveKV('plan',S.plan);
+export const saveFavs=()=>saveKV('favs',S.favs);
 export const saveSettings=()=>saveKV('settings',S.settings);
 
 /* object URLs for images */
@@ -102,7 +103,7 @@ export async function readBackup(file){ /* .zip (version 2) or old .json (versio
 }
 export async function exportData(share){
   const files=[],items=S.items.map(({thumb,...it})=>{if(!it.img)return {...it,img:null};const name=`fotos/${it.id}.${EXT[it.img.type]||'bin'}`;files.push({name,blob:it.img});return {...it,img:name}});
-  const data={app:'percha',version:2,exported:new Date().toISOString(),items,pairs:[...S.pairs],blocks:[...S.blocks],rules:S.rules,wears:S.wears,plan:S.plan,settings:S.settings};
+  const data={app:'percha',version:2,exported:new Date().toISOString(),items,pairs:[...S.pairs],blocks:[...S.blocks],rules:S.rules,wears:S.wears,plan:S.plan,favs:S.favs,settings:S.settings};
   files.unshift({name:'data.json',blob:new Blob([JSON.stringify(data)],{type:'application/json'})});
   const blob=await makeZip(files);
   const fname=`percha-copia-${todayISO()}.zip`;
@@ -140,18 +141,19 @@ export function cleanBackup(data){
   const blocks=(Array.isArray(data.blocks)?data.blocks:[]).filter(k=>isStr(k)&&k.split('|').every(x=>ids.has(x)));
   const rules=(Array.isArray(data.rules)?data.rules:[]).filter(r=>Array.isArray(r)&&r.length===2&&r.every(isStr));
   const plan={};if(isObj(data.plan))for(const [d,v] of Object.entries(data.plan))if(isDate(d)&&isObj(v)){const o={style:STYLES[v.style]?v.style:undefined};for(const k of SLOTS)if(ids.has(v[k]))o[k]=v[k];plan[d]=o}
+  const favs=[],seenF=new Set();for(const f of (Array.isArray(data.favs)?data.favs:[])){if(!isObj(f)||!isStr(f.id))continue;const o={id:f.id};for(const k of SLOTS)o[k]=ids.has(f[k])?f[k]:null;const key=SLOTS.map(k=>o[k]||'').join('|');if(!o.top||!o.bottom||!o.shoes||seenF.has(key))continue;seenF.add(key);favs.push(o)}
   const st=isObj(data.settings)?data.settings:{},settings={};
   for(const k of Object.keys(S.settings)){if(!(k in st))continue;if(k==='lastExport'){if(st[k]===null||isDate(st[k]))settings[k]=st[k]}else if(typeof st[k]===typeof S.settings[k])settings[k]=st[k]}
   if(!['auto','light','dark'].includes(settings.theme))delete settings.theme;
-  return {items,wears,pairs,blocks,rules,plan,settings};
+  return {items,wears,pairs,blocks,rules,plan,favs,settings};
 }
 export async function applyImport(raw){
   const data=cleanBackup(raw); /* if anything is wrong this throws and the current data stays */
   for(const s of['items','wears','kv'])await clearStore(s);
   for(const v of URLS.values())URL.revokeObjectURL(v.url);URLS.clear();
-  S.items=data.items;S.pairs=new Set(data.pairs);S.blocks=new Set(data.blocks);S.rules=data.rules;S.wears=data.wears;S.plan=data.plan;S.settings={...S.settings,...data.settings};
+  S.items=data.items;S.pairs=new Set(data.pairs);S.blocks=new Set(data.blocks);S.rules=data.rules;S.wears=data.wears;S.plan=data.plan;S.favs=data.favs;S.settings={...S.settings,...data.settings};
   for(const it of S.items)await put('items',it);for(const w of S.wears)await put('wears',w);
-  savePairs();saveRules();savePlan();saveSettings();saveKV('seeded',true);computeStats();
+  savePairs();saveRules();savePlan();saveFavs();saveSettings();saveKV('seeded',true);computeStats();
   applyTheme(S.settings.theme||'auto');
   ensureThumbs();
 }
