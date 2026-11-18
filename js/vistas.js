@@ -17,7 +17,7 @@ try{const t0=localStorage.getItem('percha-theme');if(t0)applyTheme(t0)}catch(e){
 
 /* ---------- toast ---------- */
 export let toastT;
-export function toast(msg,action){const el=$('#toast');el.innerHTML=`<span>${esc(msg)}</span>${action?`<button type="button" id="toast-act">${esc(action.label)}</button>`:''}`;el.classList.add('show');if(action)$('#toast-act').onclick=()=>{action.fn();el.classList.remove('show')};clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),action?5200:2600)}
+export function toast(msg,action){const el=$('#toast');el.innerHTML=`<span>${esc(msg)}</span>${action?`<button type="button" id="toast-act">${esc(action.label)}</button>`:''}`;el.classList.add('show');if(action)$('#toast-act').onclick=()=>{action.fn();el.classList.remove('show')};clearTimeout(toastT);if(!(action&&action.sticky))toastT=setTimeout(()=>el.classList.remove('show'),action?5200:2600)}
 
 /* ---------- sheets ---------- */
 export let sheetPushed=false,ignorePop=false,sheetRefresh=null;

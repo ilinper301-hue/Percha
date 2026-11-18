@@ -138,4 +138,9 @@ export async function boot(){
   if(S.noStore)toast('Este navegador no permite guardar datos. Lo que hagas se perderá al cerrar.');
 }
 boot();
-if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').then(reg=>{
+  const ask=w=>{if(w&&navigator.serviceWorker.controller)toast('Hay una versión nueva',{label:'Recargar',sticky:true,fn:()=>w.postMessage('SKIP_WAITING')})};
+  ask(reg.waiting);
+  reg.addEventListener('updatefound',()=>{const w=reg.installing;if(w)w.addEventListener('statechange',()=>{if(w.state==='installed')ask(w)})});
+  let rel=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(rel)return;rel=true;location.reload()});
+}).catch(()=>{})}
