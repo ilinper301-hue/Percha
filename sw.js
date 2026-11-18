@@ -1,5 +1,5 @@
-const CACHE='percha-v13';
-const CORE=['./','./index.html','./styles.css','./js/app.js','./js/datos.js','./js/almacen.js','./js/motor.js','./js/vistas.js','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
+const CACHE='percha-v14';
+const CORE=['./','./index.html','./styles.css','./js/app.js','./js/datos.js','./js/almacen.js','./js/motor.js','./js/vistas.js','./fonts/Geist.woff','./fonts/SourceSerif4.woff','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE.map(u=>new Request(u,{cache:'reload'})))))});
 self.addEventListener('message',e=>{if(e.data==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
@@ -13,7 +13,7 @@ self.addEventListener('fetch',e=>{
       catch(_){clearTimeout(t);return (await caches.match('./index.html'))||Response.error()}
     })());return;
   }
-  if(url.origin===location.origin||url.host.endsWith('fonts.googleapis.com')||url.host.endsWith('fonts.gstatic.com')){
+  if(url.origin===location.origin){
     e.respondWith(caches.match(r).then(hit=>hit||fetch(r).then(res=>{if(res.ok||res.type==='opaque'){const c=res.clone();caches.open(CACHE).then(k=>k.put(r,c))}return res})));
   }
 });
