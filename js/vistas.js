@@ -186,7 +186,10 @@ export function viewSemana(){
 export function favSheet(){
   const list=S.favs.map(f=>({f,its:SLOTS.map(k=>get(f[k])).filter(Boolean)})).filter(x=>x.its.length>=3);
   let h=sheetHead('Favoritos')+`<div class="sh-body gut">`;
-  h+=list.length?`<div class="stack">`+list.map(({f,its})=>`<div class="favrow"><button class="favfits" tabindex="-1" aria-hidden="true">${its.map(it=>mini(it)).join('')}</button><span class="favn">${its.map(it=>esc(it.name)).join(' · ')}</span><button class="iconbtn" data-act="favToggle" data-k="${favKey(f)}" aria-label="Quitar de favoritos">${ic('x',18)}</button></div>`).join('')+`</div>`:`<p class="hint">Aún no hay favoritos. Toca el corazón de un outfit para guardarlo.</p>`;
+  const t=todayISO(),days=[...Array(7)].map((_,i)=>addDays(t,i));
+  h+=list.length?`<div class="stack">`+list.map(({f,its})=>{const bad=its.filter(it=>!available(it));return `<div class="favbox"><div class="favrow"><button class="favfits" tabindex="-1" aria-hidden="true">${its.map(it=>mini(it)).join('')}</button><span class="favn">${its.map(it=>esc(it.name)).join(' · ')}</span><button class="iconbtn" data-act="favToggle" data-k="${favKey(f)}" aria-label="Quitar de favoritos">${ic('x',18)}</button></div>
+    ${bad.length?`<p class="hint warn">${bad.map(it=>esc(it.name)).join(', ')} ${bad.length===1?'está':'están'} en el cesto o fuera de temporada.</p>`:''}
+    <div class="favact"><button class="btn small primary" data-act="favWear" data-id="${f.id}">Me lo pongo hoy</button><select class="sel" data-change="favPlan" data-id="${f.id}" aria-label="Guardar en el plan"><option value="">Guardar en el plan…</option>${days.map(d=>{const dd=parseD(d);return `<option value="${d}">${d===t?'Hoy':DOW[dd.getDay()]+' '+dd.getDate()}</option>`}).join('')}</select></div></div>`}).join('')+`</div>`:`<p class="hint">Aún no hay favoritos. Toca el corazón de un outfit para guardarlo.</p>`;
   openSheet(h+`</div>`,{tall:true,refresh:favSheet});
 }
 

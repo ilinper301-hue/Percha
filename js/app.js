@@ -53,6 +53,10 @@ export const A={
     saveFavs();render();if($('.scrim'))refreshSheet();
   },
   favSheet:()=>favSheet(),
+  favWear:async d=>{const f=S.favs.find(x=>x.id===d.id);if(!f)return;const o={};for(const k of SLOTS)o[k]=get(f[k])?f[k]:null;const t=todayISO();const was=await recordWear(o,t);if(S.plan[t])S.plan[t]={...S.plan[t],...o};savePlan();resetFlow();closeSheet();S.view='hoy';render();scrollTop();toast(was?'Outfit de hoy actualizado':'Registrado. Buen día.')},
+  favPlan:d=>{const f=S.favs.find(x=>x.id===d.id);if(!f||!d.date)return;const o={};for(const k of SLOTS)o[k]=get(f[k])?f[k]:null;const t=todayISO();
+    if(d.date===t){return A.favWear(d)}
+    S.plan[d.date]={...o,style:(S.plan[d.date]||{}).style||'',locked:true};savePlan();closeSheet();S.view='semana';render();toast('Guardado y bloqueado en el plan')},
   // flow
   flowStart:()=>{resetFlow();S.flow.active=true;render();scrollTop()},
   flowReset:()=>{resetFlow(true);S.flow.active=true;render();scrollTop()},
@@ -147,6 +151,7 @@ document.addEventListener('change',async e=>{
   if(t.id==='f-photo'){const fs=[...(t.files||[])];t.value='';if(!fs.length||!D)return;if(D.isNew&&fs.length>1&&!D.qTotal){D.queue=fs.slice(1);D.qTotal=fs.length;D.qIndex=1;D.qDone=0}loadPhoto(fs[0]);return}
   if(t.id==='imp-file'){const f=t.files&&t.files[0];t.value='';if(!f)return;try{const d=await readBackup(f);cleanBackup(d);pendingImport=d;refreshSheet()}catch(err){console.warn(err);toast('Ese archivo no es una copia de Percha')}return}
   if(t.dataset.change==='armSort'){S.armSort=t.value;render()}
+  if(t.dataset.change==='favPlan'){A.favPlan({id:t.dataset.id,date:t.value});return}
   if(t.dataset.change==='dataSort'){S.dataSort=t.value;render()}
 });
 
