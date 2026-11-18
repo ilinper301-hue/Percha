@@ -427,7 +427,12 @@ const mini=(it,extra='')=>`<span class="mini" ${extra}>${it?imgTag(it,true):''}<
 /* image sizes: full photo for detail and outfit card, thumbnail for lists and grids */
 const IMG_MAX=800,THUMB_MAX=320;
 function scaleCanvas(src,max){const s=Math.min(1,max/Math.max(src.width,src.height));if(s===1)return src;const c=document.createElement('canvas');c.width=Math.max(1,Math.round(src.width*s));c.height=Math.max(1,Math.round(src.height*s));const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(src,0,0,c.width,c.height);return c}
-const encodeCanvas=(c,alpha)=>new Promise(r=>c.toBlob(r,alpha?'image/png':'image/jpeg',.86));
+const toBlob=(c,type,q)=>new Promise(r=>c.toBlob(r,type,q));
+let WEBP=null; /* null = not tested yet; Safari can't encode WebP and returns PNG instead */
+async function encodeCanvas(c,alpha){
+  if(WEBP!==false){const b=await toBlob(c,'image/webp',.82);WEBP=!!b&&b.type==='image/webp';if(WEBP)return b}
+  return toBlob(c,alpha?'image/png':'image/jpeg',.86);
+}
 async function blobToCanvas(b){const url=URL.createObjectURL(b);try{const im=new Image();await new Promise((r,j)=>{im.onload=r;im.onerror=j;im.src=url});const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.getContext('2d').drawImage(im,0,0);return c}finally{URL.revokeObjectURL(url)}}
 async function makeThumb(blob,alpha){const c=await blobToCanvas(blob);return encodeCanvas(scaleCanvas(c,THUMB_MAX),alpha)}
 const needsThumb=it=>!it.illus&&it.img&&!it.thumb;
