@@ -145,11 +145,13 @@ details.others .hint{margin:8px 0 14px}
 /* flat lay */
 .lay{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:22px 18px 16px;margin-top:14px;display:flex;flex-direction:column;gap:14px}
 .lay-main{display:flex;gap:14px;align-items:center}
-.lay-stack{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
-.lay-i{all:unset;cursor:pointer;width:64%;aspect-ratio:1;max-width:100%;display:grid;place-items:center;border-radius:14px;overflow:hidden}
-.lay-i.k2{width:46%}
-.lay-i img{width:100%;height:100%;object-fit:contain}
-.lay-i img.cover{object-fit:cover}
+.lay-stack{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.lay-i{all:unset;cursor:pointer;box-sizing:border-box;width:60%;max-width:210px;aspect-ratio:1;background:var(--tile);border-radius:20px;display:grid;place-items:center;overflow:hidden}
+.lay-i:nth-child(2){aspect-ratio:5/6;width:50%;max-width:175px}
+.lay-i.k2{aspect-ratio:3/2;width:42%;max-width:145px;border-radius:16px}
+.lay-i:focus-visible{outline:2px solid var(--accent)}
+.lay-i img{width:84%;height:84%;object-fit:contain}
+.lay-i img.cover{width:100%;height:100%;object-fit:cover}
 .lay-ex{display:flex;flex-direction:column;gap:10px;width:22%}
 .lay-x{all:unset;cursor:pointer;aspect-ratio:1;background:var(--tile);border-radius:12px;display:grid;place-items:center;overflow:hidden}
 .lay-x img{width:80%;height:80%;object-fit:contain}
