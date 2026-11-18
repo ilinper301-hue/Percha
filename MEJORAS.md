@@ -23,7 +23,7 @@ Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abaj
 - [x] **1.1 Miniaturas aparte.** Hoy cada prenda guarda una sola imagen de hasta 1000 px (`loadPhoto`, `processPhoto`) y se usa también en miniaturas de 28-52 px. Guardar `img` (≈800 px) + `thumb` (≈200 px) y usar `thumb` en `mini()`, rejillas y semana. Migrar las prendas existentes al arrancar (generar `thumb` si falta).
 - [x] **1.2 WebP.** Codificar en `image/webp` (con transparencia si se quitó el fondo) y caer a PNG/JPEG si el navegador no lo admite (`canvas.toBlob` devuelve otro tipo).
 - [x] **1.3 Copia en ZIP.** `exportData` mete todas las fotos en base64 dentro de un único JSON: con 100+ prendas puede agotar la memoria del móvil. Pasar a ZIP (`data.json` + carpeta `fotos/`) con un compresor mínimo propio (formato ZIP "store", sin dependencias). Mantener la importación del JSON antiguo.
-- [ ] **1.4 Compartir la copia.** Usar `navigator.share({files:[...]})` cuando exista (para mandarla a Drive, WhatsApp, etc.) y la descarga como alternativa.
+- [x] **1.4 Compartir la copia.** Usar `navigator.share({files:[...]})` cuando exista (para mandarla a Drive, WhatsApp, etc.) y la descarga como alternativa.
 - [ ] **1.5 Importación robusta.** Validar estructura y tipos en `applyImport`, no borrar nada hasta que la copia se haya leído entera, y aplicar el tema importado (`applyTheme`).
 
 ## Fase 2 · Añadir prendas más rápido
@@ -70,3 +70,4 @@ Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abaj
 | 18-11-2026 | 1.2 WebP | `encodeCanvas` prueba `image/webp` (calidad 0,82) y, si el navegador no lo codifica (Safari), cae a PNG/JPEG y no lo vuelve a intentar. Mantiene la transparencia. En prueba: ≈8× menos que PNG sin fondo y ≈2× menos que JPEG. Las fotos ya guardadas no se recodifican. Caché `percha-v5`. |
 | 18-11-2026 | 1.3 Copia en ZIP | `percha-copia-AAAA-MM-DD.zip` con `data.json` (`version:2`, `img` = ruta) + `fotos/<id>.<ext>`. ZIP "store" propio (`makeZip`/`readZip`, con CRC comprobado). `readBackup` detecta ZIP o JSON antiguo (v1). Probado con `unzip -t` y restaurando ambos formatos. Caché `percha-v6`. |
 | 18-11-2026 | Modelo y esfuerzo | Añadida la tabla de modelo y esfuerzo recomendados por tarea. |
+| 18-11-2026 | 1.4 Compartir | Botón "Compartir copia" en Ajustes, solo si el navegador admite `navigator.share` con archivos; "Exportar copia" sigue descargando. Si se cancela el menú no se marca la copia como hecha. Caché `percha-v7`. |

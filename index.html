@@ -859,7 +859,7 @@ function settingsSheet(){
   h+=S.rules.map((r,i)=>`<div class="row between" style="padding:6px 0"><span><span class="dot" style="background:${swatchBg(r[0])}"></span> ${cap(r[0])} &nbsp;+&nbsp; <span class="dot" style="background:${swatchBg(r[1])}"></span> ${cap(r[1])}</span><button class="iconbtn" data-act="delRule" data-i="${i}" aria-label="Quitar regla">${ic('x',18)}</button></div>`).join('');
   const opts=COLORS.map(([n])=>`<option value="${n}">${cap(n)}</option>`).join('');
   h+=`<div class="rulerow"><select class="sel" id="rule-a" aria-label="Primer color">${opts}</select><select class="sel" id="rule-b" aria-label="Segundo color">${opts.replace('value="beige"','value="beige" selected')}</select><button class="btn small" data-act="addRule">Añadir</button></div></div>`;
-  h+=`<div class="field"><span class="label">Copia de seguridad</span><p class="hint">Todo se guarda solo en este móvil. Si borras los datos del navegador se pierde, así que guarda una copia de vez en cuando. ${s.lastExport?'Última copia: '+fmtShort(s.lastExport)+'.':'Aún no has hecho ninguna.'}</p><div class="row"><button class="btn" data-act="export">Exportar copia</button><button class="btn" data-act="importPick">Importar copia</button></div>`;
+  h+=`<div class="field"><span class="label">Copia de seguridad</span><p class="hint">Todo se guarda solo en este móvil. Si borras los datos del navegador se pierde, así que guarda una copia de vez en cuando. ${s.lastExport?'Última copia: '+fmtShort(s.lastExport)+'.':'Aún no has hecho ninguna.'}</p><div class="row"><button class="btn" data-act="export">Exportar copia</button><button class="btn" data-act="importPick">Importar copia</button></div>${CAN_SHARE?`<button class="btn block" data-act="shareBackup" style="margin-top:8px">Compartir copia (Drive, WhatsApp…)</button>`:''}`;
   if(pendingImport)h+=`<div class="confirm"><p>La copia tiene ${pendingImport.items.length} prendas y ${(pendingImport.wears||[]).length} outfits. Sustituirá todo lo que hay ahora en la app.</p><div class="row"><button class="btn small dark" data-act="importDo">Sustituir</button><button class="btn small ghost" data-act="importCancel">Cancelar</button></div></div>`;
   h+=`</div>`;
   h+=`<div class="field"><span class="label">Datos</span>`;
@@ -918,6 +918,7 @@ async function readZip(file){ /* → Map name → Uint8Array (store only, CRC ch
   }
   return out;
 }
+const CAN_SHARE=(()=>{try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([''],'a.zip',{type:'application/zip'})]}))}catch(e){return false}})();
 const EXT={'image/webp':'webp','image/png':'png','image/jpeg':'jpg','image/svg+xml':'svg'},MIME=Object.fromEntries(Object.entries(EXT).map(([m,e])=>[e,m]));
 async function readBackup(file){ /* .zip (version 2) or old .json (version 1) → data with img as Blob or data URL */
   const sig=new Uint8Array(await file.slice(0,2).arrayBuffer());
@@ -930,12 +931,18 @@ async function readBackup(file){ /* .zip (version 2) or old .json (version 1) �
   if(!data||data.app!=='percha'||!Array.isArray(data.items))throw new Error('no es Percha');
   return data;
 }
-async function exportData(){
+async function exportData(share){
   const files=[],items=S.items.map(({thumb,...it})=>{if(!it.img)return {...it,img:null};const name=`fotos/${it.id}.${EXT[it.img.type]||'bin'}`;files.push({name,blob:it.img});return {...it,img:name}});
   const data={app:'percha',version:2,exported:new Date().toISOString(),items,pairs:[...S.pairs],blocks:[...S.blocks],rules:S.rules,wears:S.wears,plan:S.plan,settings:S.settings};
   files.unshift({name:'data.json',blob:new Blob([JSON.stringify(data)],{type:'application/json'})});
   const blob=await makeZip(files);
   const fname=`percha-copia-${todayISO()}.zip`;
+  if(share){
+    const file=new File([blob],fname,{type:'application/zip'});
+    try{await navigator.share({files:[file],title:'Copia de Percha'})}
+    catch(e){if(e&&e.name==='AbortError')return;console.warn(e);return toast('No se pudo compartir. Prueba con Exportar')}
+    S.settings.lastExport=todayISO();saveSettings();toast('Copia compartida');refreshSheet();if(!$('.scrim'))render();return;
+  }
   const dl=window.claude&&window.claude.use?await window.claude.use('downloads').catch(()=>null):null;
   if(dl){try{await dl.save({filename:fname,data:blob})}catch(e){return toast('No se guardó la copia')}S.settings.lastExport=todayISO();saveSettings();toast('Copia guardada');refreshSheet();if(!$('.scrim'))render();return}
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();a.remove();
@@ -1048,6 +1055,7 @@ const A={
   stepSet:d=>{const k=d.k,lim=k==='noRepeat'?[1,7]:[7,120];S.settings[k]=Math.max(lim[0],Math.min(lim[1],S.settings[k]+ +d.d));saveSettings();refreshSheet()},
   addRule:()=>{const a=$('#rule-a').value,b=$('#rule-b').value;if(a===b)return toast('Elige dos colores distintos');if(S.rules.some(r=>(r[0]===a&&r[1]===b)||(r[0]===b&&r[1]===a)))return toast('Esa regla ya existe');S.rules.push([a,b]);saveRules();refreshSheet();toast('Regla añadida')},
   delRule:d=>{S.rules.splice(+d.i,1);saveRules();refreshSheet()},
+  shareBackup:()=>exportData(true).catch(e=>{console.warn(e);toast('No se pudo compartir la copia')}),
   export:()=>exportData().catch(e=>{console.warn(e);toast('No se pudo exportar la copia')}),
   importPick:()=>$('#imp-file').click(),
   importDo:async()=>{const data=pendingImport;pendingImport=null;try{await applyImport(data);closeSheet();toast('Copia restaurada')}catch(e){console.warn(e);toast('No se pudo restaurar la copia')}},
