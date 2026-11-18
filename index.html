@@ -300,7 +300,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   </div>
   <nav class="tabs gut" id="tabs"></nav>
 </div>
-<input type="file" id="f-photo" accept="image/*" hidden>
+<input type="file" id="f-photo" accept="image/*" multiple hidden>
 <input type="file" id="imp-file" accept=".zip,application/zip,application/x-zip-compressed,.json,application/json" hidden>
 <div id="toast" role="status" aria-live="polite"></div>
 
@@ -725,7 +725,8 @@ function editSheet(id,cat){
 }
 function drawEdit(){
   const segs=(field,opts,multi)=>`<div class="seg" data-field="${field}" data-multi="${multi?1:0}">${opts.map(([k,l])=>`<button type="button" class="pill${(multi?D[field].includes(k):D[field]===k)?' on':''}" data-act="seg" data-v="${k}">${l}</button>`).join('')}</div>`;
-  let h=sheetHead(D.isNew?'Nueva prenda':'Editar prenda','<button class="link" data-act="cancelEdit">Cancelar</button>','<button class="link strong" data-act="saveItem">Guardar</button>')+`<div class="sh-body gut">`;
+  const q=D.qTotal>1,more=q&&D.qIndex<D.qTotal;
+  let h=sheetHead(q?`Prenda ${D.qIndex} de ${D.qTotal}`:D.isNew?'Nueva prenda':'Editar prenda','<button class="link" data-act="cancelEdit">'+(q?'Terminar':'Cancelar')+'</button>',`<button class="link strong" data-act="saveItem">${more?'Siguiente':'Guardar'}</button>`)+`<div class="sh-body gut">`;
   h+=`<label class="photo${D.hasPhoto?' has':''}" for="f-photo" id="photo-box"><img id="f-prev" alt="" src="${previewSrc()}" class="${D.hasPhoto&&D.fit==='cover'?'cover':''}"><span class="ov">${ic('camera',16,1.8)}${D.hasPhoto?'Cambiar foto':'Añadir foto'}</span></label>`;
   if(D.src)h+=`<div class="field"><div class="toggle"><div><b style="font-weight:500">Quitar fondo</b><p>Funciona mejor con la prenda sobre un fondo liso.</p></div><button type="button" class="switch" role="switch" aria-checked="${D.removeBg}" data-act="bgToggle" aria-label="Quitar fondo"></button></div>${D.removeBg?`<label class="hint" for="f-tol">Sensibilidad</label><input type="range" id="f-tol" min="8" max="90" value="${D.tol}" data-input="tol">`:''}</div>`;
   else if(!D.hasPhoto)h+=`<p class="hint" style="margin-top:-12px;text-align:center">Sin foto se usa una ilustración del color que elijas.</p>`;
@@ -785,7 +786,17 @@ async function saveItem(){
   await put('items',it);
   if(!old){try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}}
   computeStats();
-  const isNew=D.isNew;D=null;
+  const isNew=D.isNew;
+  if(D.qTotal>1){
+    const n=(D.qDone||0)+1,files=D.queue||[];
+    if(files.length){
+      const prev=D;
+      D={id:uid(),name:'',cat:prev.cat,color:'',styles:[...prev.styles],season:prev.season,price:'',wild:false,laundry:false,hasPhoto:false,src:null,removeBg:false,tol:34,isNew:true,fit:'contain',queue:files.slice(1),qTotal:prev.qTotal,qIndex:prev.qIndex+1,qDone:n};
+      drawEdit();loadPhoto(files[0]);return;
+    }
+    S.armCat=it.cat;D=null;closeSheet();toast(n+' prendas añadidas');return;
+  }
+  D=null;
   if(isNew&&related(it.cat).some(c=>S.items.some(x=>x.cat===c))){S.armCat=it.cat;compatSheet(it.id,true)}
   else{toast(isNew?'Prenda añadida':'Cambios guardados');detailSheet(it.id)}
 }
@@ -1096,7 +1107,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if
 document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.input;if(!k||!D)return;if(k==='tol'){D.tol=+e.target.value;clearTimeout(D._t);D._t=setTimeout(processPhoto,140)}else D[k]=e.target.value});
 document.addEventListener('change',async e=>{
   const t=e.target;
-  if(t.id==='f-photo'){const f=t.files&&t.files[0];t.value='';if(f&&D)loadPhoto(f);return}
+  if(t.id==='f-photo'){const fs=[...(t.files||[])];t.value='';if(!fs.length||!D)return;if(D.isNew&&fs.length>1&&!D.qTotal){D.queue=fs.slice(1);D.qTotal=fs.length;D.qIndex=1;D.qDone=0}loadPhoto(fs[0]);return}
   if(t.id==='imp-file'){const f=t.files&&t.files[0];t.value='';if(!f)return;try{const d=await readBackup(f);cleanBackup(d);pendingImport=d;refreshSheet()}catch(err){console.warn(err);toast('Ese archivo no es una copia de Percha')}return}
   if(t.dataset.change==='armSort'){S.armSort=t.value;render()}
   if(t.dataset.change==='dataSort'){S.dataSort=t.value;render()}

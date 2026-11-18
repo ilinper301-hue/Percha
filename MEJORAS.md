@@ -28,7 +28,7 @@ Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abaj
 
 ## Fase 2 · Añadir prendas más rápido
 
-- [ ] **2.1 Alta múltiple.** Permitir elegir varias fotos a la vez (`multiple` en `#f-photo`) y crear una cola: se revisa cada prenda en una hoja corta (nombre, categoría, color) con "Siguiente".
+- [x] **2.1 Alta múltiple.** Permitir elegir varias fotos a la vez (`multiple` en `#f-photo`) y crear una cola: se revisa cada prenda en una hoja corta (nombre, categoría, color) con "Siguiente".
 - [ ] **2.2 Color automático.** Detectar el color dominante de la foto (ignorando el fondo quitado) y proponer el más cercano de `COLORS`. El usuario puede corregirlo.
 - [ ] **2.3 Formulario más corto.** En `drawEdit`, dejar visibles foto, nombre, categoría y color; plegar estilo, temporada, precio y comodín en "Más detalles".
 
@@ -72,3 +72,4 @@ Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abaj
 | 18-11-2026 | Modelo y esfuerzo | Añadida la tabla de modelo y esfuerzo recomendados por tarea. |
 | 18-11-2026 | 1.4 Compartir | Botón "Compartir copia" en Ajustes, solo si el navegador admite `navigator.share` con archivos; "Exportar copia" sigue descargando. Si se cancela el menú no se marca la copia como hecha. Caché `percha-v7`. |
 | 18-11-2026 | 1.5 Importación robusta | `cleanBackup` valida y limpia la copia en memoria (prendas sin id/categoría válida, fechas, referencias a prendas inexistentes, ajustes con tipo erróneo) antes de elegir el archivo y otra vez antes de borrar nada. Si falla, no se toca nada. Aplica el tema importado. Probado con archivos basura, copia con datos sucios y copia con tema oscuro. Caché `percha-v8`. **Fase 1 completa.** |
+| 18-11-2026 | 2.1 Alta múltiple | `#f-photo` admite varias fotos al crear una prenda. Cola en `D` (`queue`, `qIndex`, `qTotal`): hoja "Prenda 2 de 5" con "Siguiente" ("Guardar" en la última) y "Terminar" para cortar (las ya guardadas se conservan). Cada prenda hereda categoría, estilo y temporada de la anterior; el color y el nombre se piden de nuevo. Al acabar, toast "N prendas añadidas" sin pasar por Combinaciones (se pueden marcar luego desde la ficha). Probado con 3 fotos. Caché `percha-v9`. |
