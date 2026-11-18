@@ -8,7 +8,7 @@ export let pendingImport=null,deferredInstall=null,confirmWipe=false;
 window.addEventListener('beforeinstallprompt',e=>{deferredInstall=e});window.addEventListener('appinstalled',()=>{deferredInstall=null;toast('Percha instalada')});
 /* ---------- actions ---------- */
 const armListNow=()=>armList();
-export function resetFlow(keepTarget){const t=keepTarget?S.flow.target:null;S.flow={active:false,step:0,top:null,bottom:null,shoes:null,layers:[],acc:null,target:t}}
+export function resetFlow(keepTarget){const t=keepTarget?S.flow.target:null,m=keepTarget&&S.flow.more;S.flow={active:false,step:0,top:null,bottom:null,shoes:null,layers:[],acc:null,target:t,more:!!m}}
 const layersOfFlow=()=>Array.isArray(S.flow.layers)?S.flow.layers:[];
 export function scrollTop(){const v=$('#view');if(v)v.scrollTop=0}
 export async function addPair(a,b){S.pairs.add(pairKey(a,b));await savePairs()}
@@ -28,7 +28,7 @@ export async function deleteItem(id){
   S.items=S.items.filter(i=>i.id!==id);await del('items',id);
   for(const k of [...S.pairs]){const [a,b]=k.split('|');if(a===id||b===id)S.pairs.delete(k)}
   for(const k of [...S.blocks]){const [a,b]=k.split('|');if(a===id||b===id)S.blocks.delete(k)}savePairs();
-  for(const [d,p] of Object.entries(S.plan))if(outfitIds(p).includes(id))S.plan[d]={style:p.style};savePlan();dropFavs(new Set([id]));
+  for(const [d,p] of Object.entries(S.plan)){const more=(p.more||[]).filter(o=>!outfitIds(o).includes(id));const base=outfitIds(p).includes(id)?{style:p.style}:{...p};delete base.more;S.plan[d]=more.length?{...base,more}:base}savePlan();dropFavs(new Set([id]));
   dropURLs(id);
   S.flow.layers=layersOfFlow().filter(x=>x!==id);
   for(const k of SLOTS)if(S.flow[k]===id)resetFlow(true);
@@ -85,7 +85,8 @@ export const A={
     const f=S.flow,t=todayISO(),target=f.target||t,o=pickOutfit(f);
     if(target===t){const r=await recordWear(o,t);if(S.plan[t])S.plan[t]={...S.plan[t],...o};savePlan();resetFlow();S.view='hoy';render();scrollTop();toast(wornMsg(r))}
     else if(target<t){const r=await recordWear(o,target);resetFlow();S.view='semana';render();scrollTop();toast(wornMsg(r,true))}
-    else{S.plan[target]={...o,style:(S.plan[target]||{}).style||'',locked:true};savePlan();resetFlow();S.view='semana';render();toast('Guardado y bloqueado en el plan')}
+    else if(f.more&&S.plan[target]&&S.plan[target].top){const p=S.plan[target];const same=[p,...(p.more||[])].some(x=>favKey(x)===favKey(o));if(!same)p.more=[...(p.more||[]),o];savePlan();resetFlow();S.view='semana';render();scrollTop();toast(same?'Ese outfit ya está en el plan':'Outfit añadido al plan')}
+    else{const prev=S.plan[target]||{};S.plan[target]={...o,style:prev.style||'',locked:true,...(prev.more&&prev.more.length?{more:prev.more}:{})};savePlan();resetFlow();S.view='semana';render();toast('Guardado y bloqueado en el plan')}
   },
   undoToday:async d=>{const w=S.wears.find(x=>x.id===d.id);if(!w)return;S.wears=S.wears.filter(x=>x!==w);await del('wears',w.id);computeStats();render();toast('Outfit quitado de hoy',{label:'Deshacer',fn:async()=>{S.wears.push(w);await put('wears',w);computeStats();render()}})},
   wearPlan:async d=>{const p=S.plan[d.date];if(!p)return;await recordWear(p,d.date);if($('.scrim'))closeSheet();S.view='hoy';resetFlow();render();toast('Registrado. Buen día.')},
@@ -132,12 +133,14 @@ export const A={
   pairAll:async d=>{const a=get(d.id);for(const o of S.items.filter(i=>i.cat===d.cat)){const k=pairKey(a.id,o.id);if(d.on==='1'){S.pairs.add(k);S.blocks.delete(k)}else{S.pairs.delete(k);S.blocks.add(k)}}await savePairs();refreshSheet()},
   // semana
   week:d=>{S.week+=+d.d;render()},
-  genWeek:()=>{const ds=weekDates(),t=todayISO();for(const d of ds){const p=S.plan[d];if(d>=t&&p&&!p.locked)S.plan[d]={style:p.style||''}}const fails=generate(ds);render();toast(fails?`${fails} ${fails===1?'día':'días'} sin combinaciones posibles. Marca más combinaciones o cambia el estilo.`:'Semana generada')},
+  genWeek:()=>{const ds=weekDates(),t=todayISO();for(const d of ds){const p=S.plan[d];if(d>=t&&p&&!p.locked)S.plan[d]={style:p.style||'',...(p.more&&p.more.length?{more:p.more}:{})}}const fails=generate(ds);render();toast(fails?`${fails} ${fails===1?'día':'días'} sin combinaciones posibles. Marca más combinaciones o cambia el estilo.`:'Semana generada')},
   daySheet:d=>daySheet(d.date),
   dayStyle:d=>{S.plan[d.date]={...(S.plan[d.date]||{}),style:d.v};const p=S.plan[d.date];if(p.top&&!p.locked&&d.v){const ok=['top','bottom','shoes'].every(k=>(get(p[k])?.styles||[]).includes(d.v));if(!ok)generate([d.date])}savePlan();refreshSheet()},
   dayLock:d=>{const p=S.plan[d.date];if(!p)return;p.locked=!p.locked;savePlan();refreshSheet()},
-  dayRegen:d=>{const p=S.plan[d.date]||{};const was=p.locked;S.plan[d.date]={style:p.style||''};const f=generate([d.date]);if(was&&S.plan[d.date].top)S.plan[d.date].locked=true;savePlan();refreshSheet();if(f)toast('No hay combinaciones para este estilo')},
+  dayRegen:d=>{const p=S.plan[d.date]||{};const was=p.locked;S.plan[d.date]={style:p.style||'',...(p.more&&p.more.length?{more:p.more}:{})};const f=generate([d.date]);if(was&&S.plan[d.date].top)S.plan[d.date].locked=true;savePlan();refreshSheet();if(f)toast('No hay combinaciones para este estilo')},
   dayWear:d=>{resetFlow();S.flow.target=d.date;S.flow.active=true;S.view='hoy';closeSheet();scrollTop()},
+  dayPlanMore:d=>{resetFlow();S.flow.target=d.date;S.flow.more=true;S.flow.active=true;S.view='hoy';closeSheet();scrollTop()},
+  dayMoreDel:d=>{const p=S.plan[d.date];if(!p||!p.more)return;const o=p.more[+d.i];p.more=p.more.filter((_,i)=>i!==+d.i);if(!p.more.length)delete p.more;savePlan();render();refreshSheet();toast('Outfit quitado del plan',{label:'Deshacer',fn:()=>{const q=S.plan[d.date];if(!q)return;q.more=[...(q.more||[]),o];savePlan();render();refreshSheet()}})},
   dayManual:d=>{resetFlow();S.flow.target=d.date;S.flow.active=true;S.view='hoy';closeSheet();scrollTop()},
   dayClear:d=>{const p=S.plan[d.date];S.plan[d.date]={style:p?.style||''};savePlan();closeSheet()},
   // datos

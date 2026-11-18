@@ -23,6 +23,7 @@ Orden recomendado: fase 1 → 2 → 3 → 4 → 5. Dentro de cada fase, de arrib
 | 5.6 Deseos: "qué combinaría" y paso a prenda | Sonnet | Medio |
 | 6.1 Varios outfits en un día (datos y Hoy) | Sonnet | Alto |
 | 6.2 Registrar días pasados desde Semana | Sonnet | Medio |
+| 6.3 Varios outfits por día en el plan | Sonnet | Medio |
 
 ---
 
@@ -77,9 +78,11 @@ Hoy `recordWear` sustituye el registro del mismo día (`S.wears.find(w=>w.date==
 - [x] **6.1 Varios outfits en un día.** Helper `wearsOn(date)` (lista ordenada por hora de alta; añadir `at` opcional a cada registro, sin romper copias antiguas). `recordWear` añade en vez de sustituir; si es el mismo conjunto exacto, no duplicar. Hoy muestra todos los de hoy (tarjetas apiladas, cada una con "Quitar") y un botón "Añadir otro outfit" que abre el flujo; `undoToday` y `favWear` actúan sobre un registro concreto. Semana e historial muestran los de cada día (miniaturas de todos, sin romper la fila). Estadísticas ya cuentan cada registro (`computeStats`, `usageAround`, repetición): comprobar que `generate` no penaliza de más.
 - [x] **6.2 Registrar días pasados.** En la hoja del día (`daySheet`) de un día pasado o de hoy, botón "Registrar outfit" que arranque el flujo con esa fecha como destino (`confirmOutfit` ya distingue hoy / otro día: añadir el caso pasado, que guarda con `recordWear(o,fecha)` en vez de bloquear el plan). Permitir quitar registros del día. Probar que Datos (semanas, categorías, historial) cuenta los registrados a posteriori.
 
+- [x] **6.3 Varios outfits por día en el plan.** Cada día futuro puede llevar outfits extra (`S.plan[fecha].more`) además del principal.
+
 ## Ideas para más adelante (no prioritarias)
 
-- Varios outfits por día también en el plan (hoy un solo outfit planificado por día).
+- (ninguna por ahora)
 
 ---
 
@@ -119,3 +122,4 @@ Hoy `recordWear` sustituye el registro del mismo día (`S.wears.find(w=>w.date==
 | 18-11-2026 | Plan fase 6 | Añadidos 6.1 (varios outfits por día) y 6.2 (registrar días pasados) con modelo y esfuerzo recomendados. Nada implementado todavía. |
 | 18-11-2026 | 6.1 Varios outfits en un día | `wearsOn(date)` (`almacen.js`) devuelve los registros del día por hora de alta; cada registro nuevo lleva `at` (ISO), opcional al importar (`cleanBackup` lo conserva si es válido; copias antiguas valen igual). `recordWear` añade en vez de sustituir y devuelve `'dup'` si ese conjunto exacto (`favKey`, con capas y accesorio) ya está ese día. Hoy: tarjetas apiladas («Outfit 1 · 19:08»…) cada una con «Quitar» (`undoToday` y `delWear` actúan sobre un registro por `id`), «Añadir otro outfit» abre el flujo («Otro outfit para hoy», con «Cancelar» nuevo, `flowCancel`). Semana: grupos de miniaturas más pequeñas que pasan a otra línea y etiqueta «Llevado ×2»; hoja del día muestra todos. Historial ordena por fecha y hora. `generate` no se ve afectado (`usageAround` toma la distancia mínima por prenda). Probado en Chrome móvil: 2 outfits, duplicado, recarga, quitar uno y todos, copia con/sin `at`, generar semana, sin errores. Caché `percha-v30`. |
 | 18-11-2026 | 6.2 Registrar días pasados | La hoja del día (`daySheet`) de un día pasado o de hoy tiene «Registrar outfit» / «Registrar otro outfit» (`dayWear`: flujo con esa fecha como destino). En `confirmOutfit` nuevo caso `target<hoy`: `recordWear(o,fecha)` sin tocar el plan y vuelve a Semana (título «Registrar outfit del lunes 16», botón «Guardar registro»; avisa si el conjunto ya estaba ese día). Cada registro de la hoja lleva «Quitar registro» (`delWear`, con «Deshacer», refresca la hoja). Datos e historial lo cuentan sin cambios. Probado en Chrome móvil: registrar en lunes pasado con otro ya registrado, quitar, Datos, sin errores. Caché `percha-v31`. **Plan terminado.** |
+| 18-11-2026 | 6.3 Varios outfits en el plan | `S.plan[fecha]` admite `more:[outfit,…]` además del principal (solo días futuros). En la hoja del día, «Añadir otro outfit» abre el flujo con `flow.more` («Otro outfit para el jueves 19», botón «Añadir al plan»; no duplica un conjunto ya presente) y cada extra lleva «Quitar este outfit» con «Deshacer». Semana muestra todos los conjuntos del día y la etiqueta «Plan ×N». `generate`, «Regenerar»/«Generar semana» y borrar una prenda conservan o limpian los extras; `cleanBackup` los valida (copias sin `more` valen igual). Los extras no se registran como llevados (se hace desde Hoy con «Añadir otro outfit»). Probado en Chrome móvil: añadir, recargar, quitar, sin errores. Caché `percha-v32`. |

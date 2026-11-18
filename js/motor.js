@@ -56,7 +56,7 @@ export function generate(dates){
     const cur=S.plan[d]||{};if(cur.locked||d<t)continue;
     const style=cur.style||'';
     const cs=combos(it=>available(it)&&(!style||(it.styles||[]).includes(style)));
-    if(!cs.length){S.plan[d]={style};fails++;continue}
+    if(!cs.length){S.plan[d]={style,...(cur.more&&cur.more.length?{more:cur.more}:{})};fails++;continue}
     const used=usageAround(d,N);let best=null,bs=Infinity;
     for(const [tp,bt,sh] of cs){
       let sc=Math.random()*6;
@@ -75,7 +75,7 @@ export function generate(dates){
       }
       if(lb)layers=[lb.id];
     }
-    S.plan[d]={top:best[0].id,bottom:best[1].id,shoes:best[2].id,layers,style};
+    S.plan[d]={top:best[0].id,bottom:best[1].id,shoes:best[2].id,layers,style,...(cur.more&&cur.more.length?{more:cur.more}:{})};
   }
   savePlan();return fails;
 }

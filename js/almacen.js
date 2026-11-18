@@ -145,7 +145,7 @@ export function cleanBackup(data){
   const pairs=(Array.isArray(data.pairs)?data.pairs:[]).filter(k=>isStr(k)&&k.split('|').every(x=>ids.has(x)));
   const blocks=(Array.isArray(data.blocks)?data.blocks:[]).filter(k=>isStr(k)&&k.split('|').every(x=>ids.has(x)));
   const rules=(Array.isArray(data.rules)?data.rules:[]).filter(r=>Array.isArray(r)&&r.length===2&&r.every(isStr));
-  const plan={};if(isObj(data.plan))for(const [d,v] of Object.entries(data.plan))if(isDate(d)&&isObj(v)){const o={style:STYLES[v.style]?v.style:undefined},p=pickOutfit(v,ok);for(const k of ['top','bottom','shoes','acc'])if(p[k])o[k]=p[k];if(p.layers.length)o.layers=p.layers;plan[d]=o}
+  const plan={};if(isObj(data.plan))for(const [d,v] of Object.entries(data.plan))if(isDate(d)&&isObj(v)){const o={style:STYLES[v.style]?v.style:undefined},p=pickOutfit(v,ok);for(const k of ['top','bottom','shoes','acc'])if(p[k])o[k]=p[k];if(p.layers.length)o.layers=p.layers;const more=Array.isArray(v.more)?v.more.filter(isObj).map(x=>pickOutfit(x,ok)).filter(x=>x.top&&x.bottom&&x.shoes).map(x=>{const q={};for(const k of ['top','bottom','shoes','acc'])if(x[k])q[k]=x[k];if(x.layers.length)q.layers=x.layers;return q}):[];if(more.length)o.more=more;plan[d]=o}
   const favs=[],seenF=new Set();for(const f of (Array.isArray(data.favs)?data.favs:[])){if(!isObj(f)||!isStr(f.id))continue;const o={id:f.id,...pickOutfit(f,ok)};const key=favKey(o);if(!o.top||!o.bottom||!o.shoes||seenF.has(key))continue;seenF.add(key);favs.push(o)}
   const wishes=[],wid=new Set();
   for(const r of (Array.isArray(data.wishes)?data.wishes:[])){

@@ -74,7 +74,7 @@ export function flowHTML(target){
   const f=S.flow,step=f.step,t=todayISO(),isToday=target===t,more=isToday&&wearsOn(t).length>0;
   const d=parseD(target);
   let h=`<p class="eyebrow">${fmtLong(target)}${f.target?` · <button class="link" style="font-size:13px;padding:0 6px;margin:-14px 0" data-act="cancelTarget">Cancelar</button>`:isToday&&more?` · <button class="link" style="font-size:13px;padding:0 6px;margin:-14px 0" data-act="flowCancel">Cancelar</button>`:''}</p>`;
-  h+=`<h1 class="h1">${isToday?(more?'Otro outfit para hoy':'¿Qué te pones hoy?'):(target<t?'Registrar outfit del ':'Outfit para el ')+DOW[d.getDay()]+' '+d.getDate()}</h1>`;
+  h+=`<h1 class="h1">${isToday?(more?'Otro outfit para hoy':'¿Qué te pones hoy?'):(target<t?'Registrar outfit del ':f.more?'Otro outfit para el ':'Outfit para el ')+DOW[d.getDay()]+' '+d.getDate()}</h1>`;
   h+=`<div class="prog" aria-label="Paso ${Math.min(step+1,3)} de 3">${[0,1,2].map(i=>`<i class="${i<step?'done':i===step?'cur':''}"></i>`).join('')}</div>`;
   const ks=['top','bottom','shoes'];
   const chips=ks.map((k,i)=>{const it=get(f[k]);if(!it||i>=step)return '';return `<button class="chip-it" data-act="goStep" data-step="${i}">${mini(it)}<span>${esc(it.name)}</span></button>`}).join('');
@@ -104,7 +104,7 @@ export function summaryHTML(target,isToday){
   const L=layersOf(f).map(get).filter(Boolean),canLayer=layerPool().length>0;
   const extras=['acc'].filter(k=>S.items.some(i=>i.cat===k&&available(i)));
   if(L.length||canLayer||extras.length){h+=`<div class="stack" style="margin-top:12px">`+L.map((it,i)=>`<div class="extra">${mini(it)}<span style="flex:1"><b>${esc(it.name)}</b><br>Capa ${i+1}${L.length>1?(i===0?' · la de dentro':i===L.length-1?' · la de fuera':''):''}</span><button class="iconbtn" data-act="delLayer" data-id="${it.id}" aria-label="Quitar ${esc(it.name)}">${ic('x',18)}</button></div>`).join('')+(canLayer?`<button class="extra" data-act="pickerExtra" data-cat="layer">${ic('plus',20)}<span>${L.length?'Añadir otra capa':'Añadir capa'} <span style="color:var(--muted)">(jersey, abrigo… opcional)</span></span></button>`:'')+extras.map(k=>{const it=get(f[k]);return `<button class="extra" data-act="pickerExtra" data-cat="${k}">${it?mini(it)+`<span><b>${esc(it.name)}</b><br>${CATS[k].label} · cambiar</span>`:`${ic('plus',20)}<span>Añadir ${CATS[k].one} <span style="color:var(--muted)">(opcional)</span></span>`}</button>`}).join('')+`</div>`}
-  h+=`<div class="actions"><button class="btn primary block" data-act="confirmOutfit">${isToday?'Me lo pongo hoy':target<todayISO()?'Guardar registro':'Guardar en el plan'}</button><button class="btn ghost block" data-act="flowReset">Empezar de nuevo</button></div>`;
+  h+=`<div class="actions"><button class="btn primary block" data-act="confirmOutfit">${isToday?'Me lo pongo hoy':target<todayISO()?'Guardar registro':f.more?'Añadir al plan':'Guardar en el plan'}</button><button class="btn ghost block" data-act="flowReset">Empezar de nuevo</button></div>`;
   return h;
 }
 export function outfitCard(o){
@@ -178,9 +178,9 @@ export function viewSemana(){
     const dd=parseD(d),past=d<t,p=S.plan[d]||{},ws=wearsOn(d),w=ws.length>0;
     const o=w?null:(p.top?p:null);
     const grp=x=>outfitIds(x).map(get).filter(Boolean).map(it=>mini(it)).join('');
-    const fits=ws.length>1?ws.map(x=>`<span class="ofit">${grp(x)}</span>`).join(''):ws.length?grp(ws[0]):o?grp(o):`<span class="none">${past?'Sin registro':'Sin plan'}</span>`;
-    const meta=[w?`<span class="tag acc">Llevado${ws.length>1?' ×'+ws.length:''}</span>`:'',p.style&&!w?`<span class="tag">${STYLES[p.style]}</span>`:'',p.locked&&!w?ic('lock',16):''].join('');
-    return `<li><button class="day${d===t?' today':''}${past&&!w?' past':''}" data-act="daySheet" data-date="${d}"><span class="dname">${DOWS[dd.getDay()]}<b>${dd.getDate()}</b></span><span class="dfits${ws.length>1?' multi':''}">${fits}</span><span class="dmeta">${meta}</span></button></li>`;
+    const pm=o?[o,...(p.more||[])]:[],gs=ws.length?ws:pm;const fits=gs.length>1?gs.map(x=>`<span class="ofit">${grp(x)}</span>`).join(''):ws.length?grp(ws[0]):o?grp(o):`<span class="none">${past?'Sin registro':'Sin plan'}</span>`;
+    const meta=[w?`<span class="tag acc">Llevado${ws.length>1?' ×'+ws.length:''}</span>`:'',p.style&&!w?`<span class="tag">${STYLES[p.style]}</span>`:'',pm.length>1?`<span class="tag">Plan ×${pm.length}</span>`:'',p.locked&&!w?ic('lock',16):''].join('');
+    return `<li><button class="day${d===t?' today':''}${past&&!w?' past':''}" data-act="daySheet" data-date="${d}"><span class="dname">${DOWS[dd.getDay()]}<b>${dd.getDate()}</b></span><span class="dfits${gs.length>1?' multi':''}">${fits}</span><span class="dmeta">${meta}</span></button></li>`;
   }).join('')+`</ul>`;
   return h;
 }
@@ -396,7 +396,7 @@ export function daySheet(d){
   const p=S.plan[d]||{},t=todayISO(),dd=parseD(d),ws=wearsOn(d),w=ws.length>0,past=d<t;
   let h=sheetHead(cap(DOW[dd.getDay()])+' '+dd.getDate()+' de '+MON[dd.getMonth()])+`<div class="sh-body gut">`;
   if(w){h+=ws.map((x,i)=>`<div><span class="label">Llevado${ws.length>1?' · outfit '+(i+1):''}</span>${outfitCard(x)}<button class="btn ghost block" style="margin-top:8px" data-act="delWear" data-id="${x.id}">Quitar registro</button></div>`).join('')}
-  else if(p.top){h+=outfitCard(p)}
+  else if(p.top){h+=(p.more&&p.more.length&&!past?'<span class="label">Outfit 1</span>':'')+outfitCard(p)+(p.more||[]).map((x,i)=>`<div><span class="label">Outfit ${i+2}</span>${outfitCard(x)}${!past?`<button class="btn ghost block" style="margin-top:8px" data-act="dayMoreDel" data-date="${d}" data-i="${i}">Quitar este outfit</button>`:''}</div>`).join('')}
   else h+=`<div class="empty"><p>${past?'No registraste nada este día.':'Este día aún no tiene outfit.'}</p></div>`;
   if(!past&&!w){
     h+=`<div class="field"><span class="label">Estilo del día</span><div class="seg">${[['','Cualquiera'],...Object.entries(STYLES)].map(([k,l])=>`<button class="pill${(p.style||'')===k?' on':''}" data-act="dayStyle" data-date="${d}" data-v="${k}">${l}</button>`).join('')}</div></div>`;
@@ -404,6 +404,7 @@ export function daySheet(d){
     h+=`<div class="stack">`;
     if(d===t&&p.top)h+=`<button class="btn primary block" data-act="wearPlan" data-date="${d}">Me lo pongo hoy</button>`;
     h+=`<button class="btn block" data-act="dayRegen" data-date="${d}">${ic('refresh',18,1.8)}${p.top?'Otra combinación':'Generar este día'}</button><button class="btn block" data-act="dayManual" data-date="${d}">Elegir yo</button>`;
+    if(p.top&&d>t)h+=`<button class="btn block" data-act="dayPlanMore" data-date="${d}">Añadir otro outfit</button>`;
     if(p.top)h+=`<button class="btn ghost block" data-act="dayClear" data-date="${d}">Quitar del plan</button>`;
     h+=`</div>`;
   }else if(d===t&&w){h+=`<div class="stack"><button class="btn block" data-act="tab" data-v="hoy">Ver en Hoy</button><button class="btn block" data-act="dayWear" data-date="${d}">Registrar otro outfit</button></div>`}
