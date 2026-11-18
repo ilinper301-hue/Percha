@@ -301,7 +301,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   <nav class="tabs gut" id="tabs"></nav>
 </div>
 <input type="file" id="f-photo" accept="image/*" hidden>
-<input type="file" id="imp-file" accept="application/json,.json" hidden>
+<input type="file" id="imp-file" accept=".zip,application/zip,application/x-zip-compressed,.json,application/json" hidden>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -860,7 +860,7 @@ function settingsSheet(){
   const opts=COLORS.map(([n])=>`<option value="${n}">${cap(n)}</option>`).join('');
   h+=`<div class="rulerow"><select class="sel" id="rule-a" aria-label="Primer color">${opts}</select><select class="sel" id="rule-b" aria-label="Segundo color">${opts.replace('value="beige"','value="beige" selected')}</select><button class="btn small" data-act="addRule">Añadir</button></div></div>`;
   h+=`<div class="field"><span class="label">Copia de seguridad</span><p class="hint">Todo se guarda solo en este móvil. Si borras los datos del navegador se pierde, así que guarda una copia de vez en cuando. ${s.lastExport?'Última copia: '+fmtShort(s.lastExport)+'.':'Aún no has hecho ninguna.'}</p><div class="row"><button class="btn" data-act="export">Exportar copia</button><button class="btn" data-act="importPick">Importar copia</button></div>`;
-  if(pendingImport)h+=`<div class="confirm"><p>La copia tiene ${pendingImport.items.length} prendas y ${pendingImport.wears.length} outfits. Sustituirá todo lo que hay ahora en la app.</p><div class="row"><button class="btn small dark" data-act="importDo">Sustituir</button><button class="btn small ghost" data-act="importCancel">Cancelar</button></div></div>`;
+  if(pendingImport)h+=`<div class="confirm"><p>La copia tiene ${pendingImport.items.length} prendas y ${(pendingImport.wears||[]).length} outfits. Sustituirá todo lo que hay ahora en la app.</p><div class="row"><button class="btn small dark" data-act="importDo">Sustituir</button><button class="btn small ghost" data-act="importCancel">Cancelar</button></div></div>`;
   h+=`</div>`;
   h+=`<div class="field"><span class="label">Datos</span>`;
   if(hasDemo())h+=`<button class="btn block" data-act="clearDemo">Borrar el armario de ejemplo</button>`;
@@ -880,21 +880,72 @@ function guideSheet(){
 }
 function blobToDataURL(b){return new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=j;fr.readAsDataURL(b)})}
 function dataURLToBlob(u){const [h,b]=u.split(',');const mime=(h.match(/data:([^;,]+)/)||[])[1]||'application/octet-stream';if(/;base64/.test(h)){const bin=atob(b),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:mime})}return new Blob([decodeURIComponent(b)],{type:mime})}
+/* minimal ZIP (method "store", no compression: photos are already compressed) */
+const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(u8){let c=0xFFFFFFFF;for(let i=0;i<u8.length;i++)c=CRC_T[(c^u8[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0}
+async function makeZip(files){ /* files: [{name, blob}] → Blob */
+  const enc=new TextEncoder(),d=new Date(),dt=((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1)),dd=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate());
+  const parts=[],cd=[];let off=0;
+  for(const f of files){
+    const name=enc.encode(f.name),data=new Uint8Array(await f.blob.arrayBuffer()),crc=crc32(data),size=data.length;
+    const h=new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true);h.setUint16(4,10,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,dt,true);h.setUint16(12,dd,true);h.setUint32(14,crc,true);h.setUint32(18,size,true);h.setUint32(22,size,true);h.setUint16(26,name.length,true);h.setUint16(28,0,true);
+    parts.push(h,name,f.blob);
+    const c=new DataView(new ArrayBuffer(46));
+    c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,10,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,dt,true);c.setUint16(14,dd,true);c.setUint32(16,crc,true);c.setUint32(20,size,true);c.setUint32(24,size,true);c.setUint16(28,name.length,true);c.setUint32(42,off,true);
+    cd.push(c,name);off+=30+name.length+size;
+  }
+  const cdSize=cd.reduce((n,x)=>n+x.byteLength,0),e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cdSize,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...cd,e],{type:'application/zip'});
+}
+async function readZip(file){ /* → Map name → Uint8Array (store only, CRC checked) */
+  const tail=new DataView(await file.slice(Math.max(0,file.size-65557)).arrayBuffer());
+  let p=-1;for(let i=tail.byteLength-22;i>=0;i--)if(tail.getUint32(i,true)===0x06054b50){p=i;break}
+  if(p<0)throw new Error('zip: sin directorio');
+  const n=tail.getUint16(p+10,true),cdSize=tail.getUint32(p+12,true),cdOff=tail.getUint32(p+16,true);
+  const cd=new DataView(await file.slice(cdOff,cdOff+cdSize).arrayBuffer()),dec=new TextDecoder(),out=new Map();
+  for(let i=0,q=0;i<n;i++){
+    if(cd.getUint32(q,true)!==0x02014b50)throw new Error('zip: directorio dañado');
+    const method=cd.getUint16(q+10,true),crc=cd.getUint32(q+16,true),size=cd.getUint32(q+20,true),nl=cd.getUint16(q+28,true),xl=cd.getUint16(q+30,true),cl=cd.getUint16(q+32,true),lo=cd.getUint32(q+42,true);
+    const name=dec.decode(new Uint8Array(cd.buffer,q+46,nl));q+=46+nl+xl+cl;
+    if(name.endsWith('/'))continue;
+    if(method!==0)throw new Error('zip: comprimido');
+    const lh=new DataView(await file.slice(lo,lo+30).arrayBuffer());const start=lo+30+lh.getUint16(26,true)+lh.getUint16(28,true);
+    const data=new Uint8Array(await file.slice(start,start+size).arrayBuffer());
+    if(crc32(data)!==crc)throw new Error('zip: archivo dañado '+name);
+    out.set(name,data);
+  }
+  return out;
+}
+const EXT={'image/webp':'webp','image/png':'png','image/jpeg':'jpg','image/svg+xml':'svg'},MIME=Object.fromEntries(Object.entries(EXT).map(([m,e])=>[e,m]));
+async function readBackup(file){ /* .zip (version 2) or old .json (version 1) → data with img as Blob or data URL */
+  const sig=new Uint8Array(await file.slice(0,2).arrayBuffer());
+  let data;
+  if(sig[0]===0x50&&sig[1]===0x4b){
+    const z=await readZip(file),j=z.get('data.json');if(!j)throw new Error('zip sin data.json');
+    data=JSON.parse(new TextDecoder().decode(j));
+    for(const it of (Array.isArray(data.items)?data.items:[])){if(typeof it.img==='string'&&!it.img.startsWith('data:')){const b=z.get(it.img);it.img=b?new Blob([b],{type:MIME[it.img.split('.').pop()]||''}):null}}
+  }else data=JSON.parse(await file.text());
+  if(!data||data.app!=='percha'||!Array.isArray(data.items))throw new Error('no es Percha');
+  return data;
+}
 async function exportData(){
-  const items=await Promise.all(S.items.map(async it=>{const {thumb,...rest}=it;return {...rest,img:it.img?await blobToDataURL(it.img):null}}));
-  const data={app:'percha',version:1,exported:new Date().toISOString(),items,pairs:[...S.pairs],blocks:[...S.blocks],rules:S.rules,wears:S.wears,plan:S.plan,settings:S.settings};
-  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
-  const fname=`percha-copia-${todayISO()}.json`;
+  const files=[],items=S.items.map(({thumb,...it})=>{if(!it.img)return {...it,img:null};const name=`fotos/${it.id}.${EXT[it.img.type]||'bin'}`;files.push({name,blob:it.img});return {...it,img:name}});
+  const data={app:'percha',version:2,exported:new Date().toISOString(),items,pairs:[...S.pairs],blocks:[...S.blocks],rules:S.rules,wears:S.wears,plan:S.plan,settings:S.settings};
+  files.unshift({name:'data.json',blob:new Blob([JSON.stringify(data)],{type:'application/json'})});
+  const blob=await makeZip(files);
+  const fname=`percha-copia-${todayISO()}.zip`;
   const dl=window.claude&&window.claude.use?await window.claude.use('downloads').catch(()=>null):null;
   if(dl){try{await dl.save({filename:fname,data:blob})}catch(e){return toast('No se guardó la copia')}S.settings.lastExport=todayISO();saveSettings();toast('Copia guardada');refreshSheet();if(!$('.scrim'))render();return}
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`percha-copia-${todayISO()}.json`;document.body.appendChild(a);a.click();a.remove();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   S.settings.lastExport=todayISO();saveSettings();toast('Copia exportada a Descargas');refreshSheet();if(!$('.scrim'))render();
 }
 async function applyImport(data){
   for(const s of['items','wears','kv'])await clearStore(s);
   for(const v of URLS.values())URL.revokeObjectURL(v.url);URLS.clear();
-  S.items=data.items.map(({thumb,...it})=>({...it,img:it.img?dataURLToBlob(it.img):svgBlob(garmentSVG(defaultKind[it.cat],it.color))}));
+  S.items=data.items.map(({thumb,...it})=>({...it,img:it.img instanceof Blob?it.img:typeof it.img==='string'&&it.img.startsWith('data:')?dataURLToBlob(it.img):svgBlob(garmentSVG(defaultKind[it.cat],it.color))}));
   S.pairs=new Set(data.pairs||[]);S.blocks=new Set(data.blocks||[]);S.rules=data.rules||[];S.wears=data.wears||[];S.plan=data.plan||{};S.settings={...S.settings,...(data.settings||{})};
   for(const it of S.items)await put('items',it);for(const w of S.wears)await put('wears',w);
   savePairs();saveRules();savePlan();saveSettings();saveKV('seeded',true);computeStats();
@@ -1010,7 +1061,7 @@ document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.id==='f-photo'){const f=t.files&&t.files[0];t.value='';if(f&&D)loadPhoto(f);return}
-  if(t.id==='imp-file'){const f=t.files&&t.files[0];t.value='';if(!f)return;try{const data=JSON.parse(await f.text());if(data.app!=='percha'||!Array.isArray(data.items))throw 0;pendingImport=data;refreshSheet()}catch(err){toast('Ese archivo no es una copia de Percha')}return}
+  if(t.id==='imp-file'){const f=t.files&&t.files[0];t.value='';if(!f)return;try{pendingImport=await readBackup(f);refreshSheet()}catch(err){console.warn(err);toast('Ese archivo no es una copia de Percha')}return}
   if(t.dataset.change==='armSort'){S.armSort=t.value;render()}
   if(t.dataset.change==='dataSort'){S.dataSort=t.value;render()}
 });

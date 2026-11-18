@@ -25,4 +25,4 @@ Si una tarea es grande, divídela y completa solo una parte por sesión, dejánd
 
 - Todo el código está en `index.html` hasta que se haga la tarea 3.1.
 - Al cambiar archivos que cachea el service worker, sube la versión `CACHE` en `sw.js`.
-- No romper la compatibilidad con copias de seguridad antiguas (`app:'percha', version:1`).
+- No romper la compatibilidad con copias de seguridad: JSON antiguo (`app:'percha', version:1`, fotos en data URL) y ZIP actual (`version:2`, `data.json` + `fotos/`).
