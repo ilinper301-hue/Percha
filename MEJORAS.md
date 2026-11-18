@@ -2,7 +2,7 @@
 
 Análisis hecho el 13-11-2026 sobre el commit `6d46a73`. Cada tarea tiene una casilla: márcala `[x]` al terminarla y añade una línea en el **Registro** del final.
 
-Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abajo.
+Orden recomendado: fase 1 → 2 → 3 → 4 → 5. Dentro de cada fase, de arriba abajo.
 
 ## Modelo y esfuerzo recomendados
 
@@ -15,6 +15,12 @@ Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abaj
 | 3.2 a 3.4 Service worker, fuentes, fallos | Sonnet | Medio |
 | 4.1 a 4.4 y 4.6 Táctil, contraste, botones, cerrar hojas, outfit desde prenda | Sonnet | Bajo |
 | 4.5, 4.7 y 4.8 Buscar y filtrar, tarjeta de outfit, gráficas | Sonnet | Medio |
+| 5.1 Outfits favoritos (guardar y listar) | Sonnet | Medio |
+| 5.2 Usar un favorito (hoy o plan) | Sonnet | Bajo |
+| 5.3 Capas: varias prendas de abrigo/arriba | Opus | Alto |
+| 5.4 Capas en tarjeta, historial y generar semana | Sonnet | Medio |
+| 5.5 Lista de deseos (alta y lista) | Sonnet | Medio |
+| 5.6 Deseos: "qué combinaría" y paso a prenda | Sonnet | Medio |
 
 ---
 
@@ -53,11 +59,18 @@ Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abaj
 - [x] **4.7 Tarjeta de outfit.** Con fotos recortadas en cuadrado (`fit:'cover'`) el flat lay parece una pila de cuadrados: usar formas redondeadas con fondo `--tile` y mejor proporción entre arriba, abajo y calzado.
 - [x] **4.8 Datos con gráficas.** Reparto por color y por categoría, y usos por semana en las últimas 8 semanas.
 
+## Fase 5 · Favoritos, capas y lista de deseos
+
+- [ ] **5.1 Outfits favoritos.** Botón de corazón en la tarjeta de outfit (resumen y Hoy) para guardar la combinación (`top`, `bottom`, `shoes`, `outer`, `acc`) en un almacén nuevo `favs` de IndexedDB (subir versión de la base con migración). Pantalla/hoja "Favoritos" accesible desde Hoy con las tarjetas guardadas y opción de quitar. Si se borra una prenda, el favorito que la usaba se marca como incompleto o se elimina. Incluir `favs` en la copia ZIP/JSON (`version:2`, campo opcional para no romper copias antiguas) y en `cleanBackup`.
+- [ ] **5.2 Usar un favorito.** Desde la lista, "Ponérmelo hoy" / "Guardar en el plan" (reutiliza `confirmOutfit` y `S.plan`), avisando si alguna prenda está en el cesto o fuera de temporada.
+- [ ] **5.3 Capas (modelo de datos).** Hoy `outer` es una sola prenda. Permitir varias capas (camisa + jersey + abrigo): `layers:[ids]` en vez de `outer`, con orden (de dentro a fuera). Migrar `wears` y `plan` existentes (`outer` → `layers:[outer]`) al arrancar e importar, aceptando copias antiguas. Flujo: en el resumen, "Añadir capa" admite más de una.
+- [ ] **5.4 Capas en la interfaz.** Mostrar las capas en `outfitCard`, historial, Semana y Datos (usos por prenda deben contarlas); que `generate` pueda añadir una capa según la temporada.
+- [ ] **5.5 Lista de deseos.** Almacén `wishes` (nombre, categoría, color, estilo, precio estimado opcional, nota, foto opcional). Hoja "Deseos" accesible desde Armario con alta, edición y borrado. En la copia de seguridad igual que `favs`.
+- [ ] **5.6 Deseos que completan combinaciones.** En cada deseo, mostrar con cuántas prendas del armario combinaría según la guía de color (`compatReason`) y qué outfits nuevos permitiría (`combos`); botón "Ya lo tengo" que lo convierte en prenda (abre `editSheet` con los datos) y lo quita de la lista.
+
 ## Ideas para más adelante (no prioritarias)
 
 - Varios outfits por día o registrar días pasados desde Semana.
-- Capas (camisa + jersey) y outfits favoritos guardados.
-- Lista de deseos / prendas que faltan para completar combinaciones.
 
 ---
 
@@ -87,3 +100,4 @@ Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abaj
 | 18-11-2026 | 4.6 Outfit desde una prenda | Botón verde "Crear outfit con esta prenda" en la ficha (camisetas, pantalones y calzado disponibles). Acción `outfitWith`: reinicia el flujo, fija la prenda (`S.flow.seed`) y salta el paso que ya está elegido; el primer paso propone prendas que combinan con ella. `goStep` suelta la prenda fija. Probado en Chrome móvil con las tres categorías hasta "Me lo pongo hoy", sin errores. Caché `percha-v21`. |
 | 18-11-2026 | 4.7 Tarjeta de outfit | Cada prenda del flat lay va en una baldosa redondeada con fondo `--tile`: arriba cuadrada (≈210 px máx.), abajo algo más alta (5/6, más estrecha) y calzado apaisado y pequeño (3/2). Las fotos recortadas (`cover`) rellenan la baldosa; las que son figura se centran al 84 %. Solo CSS (`.lay-i`). Probado en Chrome móvil con captura, sin errores. Caché `percha-v22`. |
 | 18-11-2026 | 4.8 Datos con gráficas | Nueva sección en Datos (`chartsHTML` en `vistas.js`): columnas de outfits registrados por semana en las últimas 8 (semana de lunes a domingo, la actual a la derecha) y barras de reparto por categoría y por color (con muestra, número y %). Prendas sin color se avisan aparte. Solo HTML/CSS, sin librerías. Probado en Chrome móvil con captura y sin errores. Caché `percha-v23`. **Fase 4 completa: plan terminado.** |
+| 18-11-2026 | Plan fase 5 | Añadidos favoritos (5.1-5.2), capas (5.3-5.4) y lista de deseos (5.5-5.6) con modelo y esfuerzo recomendados. Nada implementado todavía. |
