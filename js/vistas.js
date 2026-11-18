@@ -119,18 +119,46 @@ export function tile(it,{act='detail',sel=false,dim=false,meta=true,extra='',che
 }
 
 /* ----- ARMARIO ----- */
+const norm=t=>(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+export const armFilters=()=>(S.armColor?1:0)+(S.armStyle?1:0);
+export function armList(){
+  const sorts={recent:(a,b)=>(b.added||'').localeCompare(a.added||''),most:(a,b)=>usesOf(b.id)-usesOf(a.id),least:(a,b)=>usesOf(a.id)-usesOf(b.id),last:byFresh,name:(a,b)=>a.name.localeCompare(b.name,'es'),color:(a,b)=>COLORS.findIndex(c=>c[0]===a.color)-COLORS.findIndex(c=>c[0]===b.color)};
+  const q=norm(S.armQ).trim();
+  let list=S.items.filter(i=>i.cat===S.armCat);
+  if(S.armLaundry)list=list.filter(i=>i.laundry);
+  if(q)list=list.filter(i=>norm(i.name).includes(q));
+  if(S.armColor)list=list.filter(i=>i.color===S.armColor);
+  if(S.armStyle)list=list.filter(i=>(i.styles||[]).includes(S.armStyle));
+  return list.sort(sorts[S.armSort]);
+}
+export function armBody(){
+  const list=armList(),sel=S.armSel;
+  if(!list.length){
+    const filtered=S.armQ.trim()||armFilters();
+    if(filtered)return `<div class="empty"><h2 class="h2">Nada coincide</h2><p>Prueba con otra búsqueda o quita algún filtro.</p><button class="btn" data-act="armClear">Quitar búsqueda y filtros</button></div>`;
+    return `<div class="empty"><h2 class="h2">${S.armLaundry?'Nada en el cesto':'Sin '+CATS[S.armCat].plural.toLowerCase()}</h2><p>${S.armLaundry?'Toda la ropa de esta categoría está limpia.':'Haz una foto a la prenda sobre un fondo liso y añádela.'}</p>${S.armLaundry?'':`<button class="btn primary" data-act="addItem" data-cat="${S.armCat}">Añadir ${CATS[S.armCat].one}</button>`}</div>`;
+  }
+  let h=`<div class="grid">${list.map(i=>sel?tile(i,{act:'armPick',sel:sel.has(i.id),check:sel.has(i.id)?`<span class="check">${ic('check',14,2.4)}</span>`:''}):tile(i)).join('')}</div>`;
+  if(S.armLaundry&&!sel&&!S.armQ.trim()&&!armFilters())h+=`<button class="btn block" style="margin-top:20px" data-act="allClean">Marcar todo como limpio</button>`;
+  return h;
+}
+export function armBar(){
+  const sel=S.armSel;if(!sel)return '';
+  const items=[...sel].map(get).filter(Boolean),n=items.length,allIn=n>0&&items.every(i=>i.laundry);
+  if(S.armDel)return `<div class="confirm"><p>¿Borrar ${n} ${n===1?'prenda':'prendas'}? No se puede deshacer.</p><div class="row"><button class="btn small danger" data-act="armDelDo">Sí, borrar</button><button class="btn small ghost" data-act="armDelNo">No</button></div></div>`;
+  return `<div class="selbar"><span class="num">${n} ${n===1?'seleccionada':'seleccionadas'}</span><span class="row" style="gap:6px"><button class="btn small" data-act="armAllVisible">Todas</button><button class="btn small" data-act="armLaundrySel"${n?'':' disabled'}>${allIn?'Marcar limpias':'Al cesto'}</button><button class="btn small danger" data-act="armDelAsk"${n?'':' disabled'}>Borrar</button><button class="btn small ghost" data-act="armSelEnd">Listo</button></span></div>`;
+}
 export function viewArmario(){
   const cnt=c=>S.items.filter(i=>i.cat===c).length;
-  let list=S.items.filter(i=>i.cat===S.armCat);if(S.armLaundry)list=list.filter(i=>i.laundry);
-  const sorts={recent:(a,b)=>(b.added||'').localeCompare(a.added||''),most:(a,b)=>usesOf(b.id)-usesOf(a.id),least:(a,b)=>usesOf(a.id)-usesOf(b.id),last:byFresh,name:(a,b)=>a.name.localeCompare(b.name,'es'),color:(a,b)=>COLORS.findIndex(c=>c[0]===a.color)-COLORS.findIndex(c=>c[0]===b.color)};
-  list.sort(sorts[S.armSort]);
-  const laundryN=S.items.filter(i=>i.laundry).length;
+  const laundryN=S.items.filter(i=>i.laundry).length,nf=armFilters();
   let h=demoBanner()+`<div class="row between" style="margin-top:10px"><h1 class="h1" style="margin:0">Armario</h1><span class="sub num">${S.items.length} prendas</span></div>`;
   h+=`<div class="chips" style="margin-top:14px">${CAT_ORDER.map(c=>`<button class="pill${S.armCat===c?' on':''}" data-act="armCat" data-v="${c}">${CATS[c].plural}<span class="c num">${cnt(c)}</span></button>`).join('')}</div>`;
-  h+=`<div class="row between" style="margin:14px 0 16px"><select class="sel" id="arm-sort" data-change="armSort" aria-label="Ordenar">${[['recent','Añadidas recientemente'],['most','Más usadas'],['least','Menos usadas'],['last','Más tiempo sin usar'],['name','Nombre'],['color','Color']].map(([k,l])=>`<option value="${k}"${S.armSort===k?' selected':''}>${l}</option>`).join('')}</select>${laundryN?`<button class="pill${S.armLaundry?' on':''}" data-act="armLaundry">En el cesto<span class="c num">${laundryN}</span></button>`:''}</div>`;
-  if(!list.length)h+=`<div class="empty"><h2 class="h2">${S.armLaundry?'Nada en el cesto':'Sin '+CATS[S.armCat].plural.toLowerCase()}</h2><p>${S.armLaundry?'Toda la ropa de esta categoría está limpia.':'Haz una foto a la prenda sobre un fondo liso y añádela.'}</p>${S.armLaundry?'':`<button class="btn primary" data-act="addItem" data-cat="${S.armCat}">Añadir ${CATS[S.armCat].one}</button>`}</div>`;
-  else h+=`<div class="grid">${list.map(i=>tile(i)).join('')}</div>`;
-  if(S.armLaundry&&list.length)h+=`<button class="btn block" style="margin-top:20px" data-act="allClean">Marcar todo como limpio</button>`;
+  h+=`<div class="row" style="margin-top:12px;flex-wrap:nowrap"><input class="input" id="arm-q" type="search" data-input="armQ" placeholder="Buscar por nombre" aria-label="Buscar por nombre" value="${esc(S.armQ)}" autocomplete="off" style="flex:1;min-width:0"><button class="pill${nf||S.armFilt?' on':''}" data-act="armFilt">Filtros${nf?`<span class="c num">${nf}</span>`:''}</button></div>`;
+  if(S.armFilt){
+    h+=`<div class="filt"><div class="sw">${COLORS.map(([n])=>`<button type="button" class="swc${S.armColor===n?' on':''}" data-act="armColor" data-v="${n}" style="background:${swatchBg(n)}" aria-label="${n}" aria-pressed="${S.armColor===n}"></button>`).join('')}</div><div class="seg" style="margin-top:12px">${Object.entries(STYLES).map(([k,l])=>`<button class="pill${S.armStyle===k?' on':''}" data-act="armStyle" data-v="${k}">${l}</button>`).join('')}</div></div>`;
+  }
+  h+=`<div class="row between" style="margin:12px 0 16px"><select class="sel" id="arm-sort" data-change="armSort" aria-label="Ordenar">${[['recent','Añadidas recientemente'],['most','Más usadas'],['least','Menos usadas'],['last','Más tiempo sin usar'],['name','Nombre'],['color','Color']].map(([k,l])=>`<option value="${k}"${S.armSort===k?' selected':''}>${l}</option>`).join('')}</select><span class="row" style="gap:6px">${laundryN?`<button class="pill${S.armLaundry?' on':''}" data-act="armLaundry">En el cesto<span class="c num">${laundryN}</span></button>`:''}${S.armSel?'':`<button class="pill" data-act="armSelStart">Seleccionar</button>`}</span></div>`;
+  h+=`<div id="arm-bar">${armBar()}</div><div id="arm-body">${armBody()}</div>`;
   return h;
 }
 

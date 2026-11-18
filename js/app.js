@@ -2,11 +2,12 @@
 import {$,SLOTS,diffDays,pairKey,todayISO,uid} from './datos.js';
 import {S,applyImport,cleanBackup,clearStore,db,del,dropURLs,ensureThumbs,exportData,get,getAll,idbOpen,put,readBackup,saveKV,savePairs,savePlan,saveRules,saveSettings,seedDemo,setDb} from './almacen.js';
 import {combos,compatible,computeStats,generate,lastOf,weekDates} from './motor.js';
-import {D,applyTheme,closeSheet,compatSheet,daySheet,detailSheet,drawEdit,editSheet,guideSheet,loadPhoto,pickerSheet,processPhoto,refreshSheet,render,saveItem,setD,settingsSheet,syncColor,toast,updatePreview} from './vistas.js';
+import {D,applyTheme,armBar,armBody,armList,closeSheet,compatSheet,daySheet,detailSheet,drawEdit,editSheet,guideSheet,loadPhoto,pickerSheet,processPhoto,refreshSheet,render,saveItem,setD,settingsSheet,syncColor,toast,updatePreview} from './vistas.js';
 
 export let pendingImport=null,deferredInstall=null,confirmWipe=false;
 window.addEventListener('beforeinstallprompt',e=>{deferredInstall=e});window.addEventListener('appinstalled',()=>{deferredInstall=null;toast('Percha instalada')});
 /* ---------- actions ---------- */
+const armListNow=()=>armList();
 export function resetFlow(keepTarget){const t=keepTarget?S.flow.target:null;S.flow={active:false,step:0,top:null,bottom:null,shoes:null,outer:null,acc:null,target:t}}
 export function scrollTop(){const v=$('#view');if(v)v.scrollTop=0}
 export async function addPair(a,b){S.pairs.add(pairKey(a,b));await savePairs()}
@@ -64,7 +65,19 @@ export const A={
   wearPlan:async d=>{const p=S.plan[d.date];if(!p)return;await recordWear(p,d.date);if($('.scrim'))closeSheet();S.view='hoy';resetFlow();render();toast('Registrado. Buen día.')},
   // armario
   addItem:d=>editSheet(null,d.cat),
-  armCat:d=>{S.armCat=d.v;render()},
+  armCat:d=>{S.armCat=d.v;S.armSel=S.armSel?new Set():null;S.armDel=false;render()},
+  armFilt:()=>{S.armFilt=!S.armFilt;render()},
+  armColor:d=>{S.armColor=S.armColor===d.v?'':d.v;render()},
+  armStyle:d=>{S.armStyle=S.armStyle===d.v?'':d.v;render()},
+  armClear:()=>{S.armQ='';S.armColor='';S.armStyle='';render()},
+  armSelStart:()=>{S.armSel=new Set();S.armDel=false;render()},
+  armSelEnd:()=>{S.armSel=null;S.armDel=false;render()},
+  armPick:d=>{if(!S.armSel)return;S.armSel.has(d.id)?S.armSel.delete(d.id):S.armSel.add(d.id);render()},
+  armAllVisible:()=>{for(const i of armListNow())S.armSel.add(i.id);render()},
+  armLaundrySel:async()=>{const its=[...S.armSel].map(get).filter(Boolean);const to=!its.every(i=>i.laundry);for(const it of its){it.laundry=to;await put('items',it)}S.armSel=null;render();toast(to?'Al cesto':'Marcadas como limpias')},
+  armDelAsk:()=>{S.armDel=true;render()},
+  armDelNo:()=>{S.armDel=false;render()},
+  armDelDo:async()=>{const ids=[...S.armSel];for(const id of ids)await deleteItem(id);S.armSel=null;S.armDel=false;render();toast(ids.length===1?'Prenda eliminada':ids.length+' prendas eliminadas')},
   armLaundry:()=>{S.armLaundry=!S.armLaundry;render()},
   allClean:async()=>{for(const it of S.items.filter(i=>i.laundry)){it.laundry=false;await put('items',it)}S.armLaundry=false;render();toast('Todo limpio')},
   detail:d=>detailSheet(d.id),
@@ -115,7 +128,7 @@ export const A={
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=A[el.dataset.act];if(f)f(el.dataset,el,e)});
 document.addEventListener('toggle',e=>{if(e.target.id==='f-more'&&D)D.more=e.target.open},true);
-document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.input;if(!k||!D)return;if(k==='tol'){D.tol=+e.target.value;clearTimeout(D._t);D._t=setTimeout(processPhoto,140)}else D[k]=e.target.value});
+document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.input;if(k==='armQ'){S.armQ=e.target.value;const b=$('#arm-body');if(b)b.innerHTML=armBody();return}if(!k||!D)return;if(k==='tol'){D.tol=+e.target.value;clearTimeout(D._t);D._t=setTimeout(processPhoto,140)}else D[k]=e.target.value});
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.id==='f-photo'){const fs=[...(t.files||[])];t.value='';if(!fs.length||!D)return;if(D.isNew&&fs.length>1&&!D.qTotal){D.queue=fs.slice(1);D.qTotal=fs.length;D.qIndex=1;D.qDone=0}loadPhoto(fs[0]);return}

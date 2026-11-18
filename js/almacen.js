@@ -9,7 +9,7 @@ export const S={
   blocks:new Set(),
   settings:{season:'auto',noRepeat:3,forgotten:21,lastExport:null,theme:'auto',suggest:true,suggestLevel:'wide'},
   view:'hoy',flow:{active:false,step:0,top:null,bottom:null,shoes:null,outer:null,acc:null,target:null},
-  armCat:'top',armSort:'recent',armLaundry:false,dataCat:'all',dataSort:'most',week:0,noStore:false
+  armCat:'top',armSort:'recent',armLaundry:false,armQ:'',armColor:'',armStyle:'',armFilt:false,armSel:null,armDel:false,dataCat:'all',dataSort:'most',week:0,noStore:false
 };
 export const get=id=>id?S.items.find(i=>i.id===id):null;
 /* ---------- storage (IndexedDB, all on this phone) ---------- */

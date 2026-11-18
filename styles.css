@@ -279,3 +279,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 #toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 #toast button{all:unset;cursor:pointer;color:var(--accent);font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* armario: buscar, filtrar, seleccionar */
+.filt{margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.selbar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.btn:disabled{opacity:.45;pointer-events:none}
+input[type=search]::-webkit-search-cancel-button{cursor:pointer}
