@@ -1,5 +1,5 @@
 /* Percha · vistas.js — Tema, toast, hojas y pantallas (Hoy, Armario, Semana, Datos, fichas, ajustes). */
-import {$,BS,CATS,CAT_ORDER,COLORS,DOW,DOWS,MON,MONS,SEASONS,SLOTS,STYLES,TB,ago,agoShort,cap,defaultKind,diffDays,esc,euro,fmtLong,fmtShort,garmentSVG,ic,pairKey,parseD,related,svgBlob,svgDataURL,swatchBg,todayISO,uid} from './datos.js';
+import {$,BS,CATS,addDays,CAT_ORDER,COLORS,DOW,DOWS,MON,MONS,SEASONS,SLOTS,STYLES,TB,ago,agoShort,cap,defaultKind,diffDays,esc,euro,fmtLong,fmtShort,garmentSVG,ic,pairKey,parseD,related,svgBlob,svgDataURL,swatchBg,todayISO,uid} from './datos.js';
 import {CAN_SHARE,IMG_MAX,S,THUMB_MAX,del,encodeCanvas,get,imgTag,mini,put,savePairs,scaleCanvas,urlFor} from './almacen.js';
 import {available,byFresh,combos,compatReason,compatible,computeStats,currentSeason,forgottenList,hasDemo,lastOf,outfitOK,suggestScore,usesOf,weekDates} from './motor.js';
 import {confirmWipe,deferredInstall,pendingImport} from './app.js';
@@ -180,6 +180,23 @@ export function viewSemana(){
   return h;
 }
 /* ----- DATOS ----- */
+/* ----- gráficas de Datos ----- */
+export function chartsHTML(){
+  if(!S.items.length)return '';
+  const t=todayISO(),dow=(parseD(t).getDay()+6)%7,mon=addDays(t,-dow);
+  const wk=[...Array(8)].map((_,i)=>{const a=addDays(mon,(i-7)*7),b=addDays(a,6);return {a,n:S.wears.filter(w=>w.date>=a&&w.date<=b).length}});
+  const maxW=Math.max(1,...wk.map(x=>x.n));
+  let h=`<section class="sec"><h2 class="h2">Usos por semana</h2><div class="wkchart" role="img" aria-label="Outfits registrados en las últimas 8 semanas">${wk.map((x,i)=>{const d=parseD(x.a);return `<div class="wkc"><span class="wkn num">${x.n||''}</span><span class="wkb"><i style="height:${Math.round(x.n/maxW*100)}%"${i===7?' class="cur"':''}></i></span><span class="wkl">${d.getDate()} ${MONS[d.getMonth()]}</span></div>`}).join('')}</div>${wk.every(x=>!x.n)?'<p class="hint">Aparecerá cuando registres outfits.</p>':''}</section>`;
+  const bars=(rows,total,sw)=>rows.map(([l,n,c])=>`<div class="drow"><span class="dl">${sw?`<span class="dot" style="background:${swatchBg(c)}"></span>`:''}${esc(l)}</span><span class="ubar"><i style="width:${Math.round(n/Math.max(1,rows[0][1])*100)}%"></i></span><span class="dn num">${n}<small>${Math.round(n/total*100)}%</small></span></div>`).join('');
+  const cc={};for(const i of S.items)cc[i.cat]=(cc[i.cat]||0)+1;
+  const catRows=CAT_ORDER.filter(c=>cc[c]).map(c=>[CATS[c].plural,cc[c],c]).sort((a,b)=>b[1]-a[1]);
+  h+=`<section class="sec"><h2 class="h2">Reparto por categoría</h2><div class="dchart">${bars(catRows,S.items.length,false)}</div></section>`;
+  const co={};let sin=0;for(const i of S.items){if(i.color)co[i.color]=(co[i.color]||0)+1;else sin++}
+  const colRows=Object.entries(co).map(([c,n])=>[cap(c),n,c]).sort((a,b)=>b[1]-a[1]);
+  if(colRows.length)h+=`<section class="sec"><h2 class="h2">Reparto por color</h2><div class="dchart">${bars(colRows,S.items.length,true)}</div>${sin?`<p class="hint">${sin} sin color asignado.</p>`:''}</section>`;
+  return h;
+}
+
 export function viewDatos(){
   const t=todayISO(),fl=forgottenList();
   const active30=S.items.filter(i=>{const l=lastOf(i.id);return l&&diffDays(t,l)<=30}).length;
@@ -190,6 +207,7 @@ export function viewDatos(){
   h+=`<section class="sec"><div class="sec-h"><h2 class="h2">Olvidadas</h2><span class="hint">${S.settings.forgotten} días o más sin usar</span></div>`;
   h+=fl.length?`<div class="hscroll">${fl.map(x=>`<button class="tile" data-act="detail" data-id="${x.it.id}"><span class="ph">${imgTag(x.it,true)}</span><span class="tn">${esc(x.it.name)}</span><span class="tm">${x.never?'Nunca usada':x.days+' días'}</span></button>`).join('')}</div>`:`<p class="hint">Ninguna. Estás rotando bien tu ropa.</p>`;
   h+=`</section>`;
+  h+=chartsHTML();
   // usage
   let list=S.items.filter(i=>S.dataCat==='all'||i.cat===S.dataCat);
   const cpu=i=>i.price>0?i.price/Math.max(usesOf(i.id),1):-1;
