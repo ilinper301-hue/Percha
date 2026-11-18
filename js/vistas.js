@@ -28,6 +28,11 @@ export function openSheet(html,{tall=false,refresh=null}={}){
   scrim=document.createElement('div');scrim.className='scrim';
   scrim.innerHTML=`<div class="sheet${tall?' tall':''}" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
   scrim.addEventListener('click',e=>{if(e.target===scrim)closeSheet()});
+  let drag=null;
+  scrim.addEventListener('pointerdown',e=>{const sh=scrim.querySelector('.sheet');if(!e.target.closest('.grab,.sh-head')||e.target.closest('button,a,input,select'))return;drag={y:e.clientY,dy:0,t:e.timeStamp,id:e.pointerId};sh.style.transition='none';try{sh.setPointerCapture(e.pointerId)}catch(_){}});
+  scrim.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;drag.dy=Math.max(0,e.clientY-drag.y);scrim.querySelector('.sheet').style.transform=`translateY(${drag.dy}px)`});
+  const endDrag=e=>{if(!drag||e.pointerId!==drag.id)return;const sh=scrim.querySelector('.sheet'),{dy,t}=drag;drag=null;sh.style.transition='';const fast=dy>40&&dy/Math.max(1,e.timeStamp-t)>0.5;if(e.type!=='pointercancel'&&(dy>110||fast)){sh.style.transform='translateY(100%)';closeSheet()}else sh.style.transform=''};
+  scrim.addEventListener('pointerup',endDrag);scrim.addEventListener('pointercancel',endDrag);
   document.body.appendChild(scrim);requestAnimationFrame(()=>scrim.classList.add('open'));
   if(!sheetPushed){try{history.pushState({sheet:1},'');sheetPushed=true}catch(e){}}
   return scrim.querySelector('.sheet');
