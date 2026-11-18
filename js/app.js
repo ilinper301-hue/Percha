@@ -45,8 +45,9 @@ export const A={
   flowStart:()=>{resetFlow();S.flow.active=true;render();scrollTop()},
   flowReset:()=>{resetFlow(true);S.flow.active=true;render();scrollTop()},
   cancelTarget:()=>{resetFlow();S.view='semana';render()},
-  goStep:d=>{const n=+d.step,ks=['top','bottom','shoes'];for(let i=n;i<3;i++)S.flow[ks[i]]=null;if(n===0)S.flow.outer=null;S.flow.step=n;S.flow.active=true;render()},
-  pick:d=>{const it=get(d.id),f=S.flow;f.active=true;f[it.cat]=it.id;const order=['top','bottom','shoes'];const i=order.indexOf(it.cat);for(let j=i+1;j<3;j++)f[order[j]]=null;if(it.cat==='top'&&f.outer&&!compatible(get(f.outer),it))f.outer=null;f.step=i+1;render();scrollTop()},
+  goStep:d=>{const n=+d.step,ks=['top','bottom','shoes'];S.flow.seed=null;for(let i=n;i<3;i++)S.flow[ks[i]]=null;if(n===0)S.flow.outer=null;S.flow.step=n;S.flow.active=true;render()},
+  outfitWith:d=>{const it=get(d.id);if(!it)return;const order=['top','bottom','shoes'];resetFlow();const f=S.flow;f.active=true;f[it.cat]=it.id;f.seed=it.id;let n=0;while(n<3&&f[order[n]])n++;f.step=n;if($('.scrim'))closeSheet();S.view='hoy';render();scrollTop()},
+  pick:d=>{const it=get(d.id),f=S.flow;f.active=true;f[it.cat]=it.id;const order=['top','bottom','shoes'];const i=order.indexOf(it.cat);const sd=get(f.seed);for(let j=i+1;j<3;j++)f[order[j]]=sd&&sd.cat===order[j]?sd.id:null;if(it.cat==='top'&&f.outer&&!compatible(get(f.outer),it))f.outer=null;let n=i+1;while(n<3&&f[order[n]])n++;f.step=n;render();scrollTop()},
   pickNew:async d=>{const it=get(d.id),order=['top','bottom','shoes'],i=order.indexOf(it.cat),base=get(S.flow[order[i-1]]);if(base){S.blocks.delete(pairKey(it.id,base.id));await addPair(it.id,base.id);const k=pairKey(it.id,base.id);toast('Guardado: combina con '+base.name,{label:'Deshacer',fn:()=>{S.pairs.delete(k);savePairs();render()}})}A.pick(d)},
   surprise:()=>{
     const cs=combos();if(!cs.length)return toast('Aún no hay combinaciones completas');

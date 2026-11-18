@@ -79,7 +79,7 @@ export function flowHTML(target){
   const chips=ks.map((k,i)=>{const it=get(f[k]);if(!it||i>=step)return '';return `<button class="chip-it" data-act="goStep" data-step="${i}">${mini(it)}<span>${esc(it.name)}</span></button>`}).join('');
   if(chips)h+=`<div class="chosen">${chips}</div>`;
   if(step>=3)return h+summaryHTML(target,isToday);
-  const cat=ks[step],base=step?get(f[ks[step-1]]):null;
+  const cat=ks[step],base=step?get(f[ks[step-1]]):get(f.seed);
   const all=S.items.filter(i=>i.cat===cat),pool=all.filter(available),hidden=all.length-pool.length;
   const fits=i=>{if(!base)return true;const r=compatReason(i,base);if(!r)return false;if(r==='suggest'&&cat==='shoes'){const tp=get(f.top);if(tp&&!outfitOK(tp,base,i))return false}return true};
   const rank=i=>{const r=base?compatReason(i,base):null;return r==='pair'?0:r==='suggest'&&suggestScore(i,base)===3?1:2};
@@ -225,6 +225,7 @@ export function detailSheet(id){
     const list=S.items.filter(i=>i.cat===rc&&compatible(i,it));
     h+=`<div class="field"><div class="row between"><span class="label">Combina con · ${CATS[rc].plural.toLowerCase()}</span><span class="hint num">${list.length}</span></div>${list.length?`<div class="thumbrow">${list.map(i=>mini(i)).join('')}</div>`:'<p class="hint">Nada marcado todavía.</p>'}</div>`;
   }
+  if(['top','bottom','shoes'].includes(it.cat)&&available(it))h+=`<button class="btn primary block" data-act="outfitWith" data-id="${id}">Crear outfit con esta prenda</button>`;
   if(rel.length)h+=`<button class="btn block" data-act="compat" data-id="${id}">Editar combinaciones</button>`;
   h+=`<div class="stack"><button class="btn block" data-act="toggleLaundry" data-id="${id}">${it.laundry?'Ya está limpia':'Al cesto de la ropa sucia'}</button>`;
   h+=`<div id="del-zone"><button class="btn ghost danger block" data-act="askDelete" data-id="${id}">Eliminar prenda</button></div></div>`;

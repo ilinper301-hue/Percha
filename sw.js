@@ -1,4 +1,4 @@
-const CACHE='percha-v20';
+const CACHE='percha-v21';
 const CORE=['./','./index.html','./styles.css','./js/app.js','./js/datos.js','./js/almacen.js','./js/motor.js','./js/vistas.js','./fonts/Geist.woff','./fonts/SourceSerif4.woff','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE.map(u=>new Request(u,{cache:'reload'})))))});
 self.addEventListener('message',e=>{if(e.data==='SKIP_WAITING')self.skipWaiting()});
