@@ -5,7 +5,7 @@ import {applyTheme,refreshSheet,render,toast} from './vistas.js';
 
 /* ---------- state ---------- */
 export const S={
-  items:[],pairs:new Set(),rules:[],wears:[],plan:{},favs:[],
+  items:[],pairs:new Set(),rules:[],wears:[],plan:{},favs:[],wishes:[],
   blocks:new Set(),
   settings:{season:'auto',noRepeat:3,forgotten:21,lastExport:null,theme:'auto',suggest:true,suggestLevel:'wide'},
   view:'hoy',flow:{active:false,step:0,top:null,bottom:null,shoes:null,layers:[],acc:null,target:null},
@@ -26,6 +26,7 @@ export const savePairs=()=>{saveKV('blocks',[...S.blocks]);return saveKV('pairs'
 export const saveRules=()=>saveKV('rules',S.rules);
 export const savePlan=()=>saveKV('plan',S.plan);
 export const saveFavs=()=>saveKV('favs',S.favs);
+export const saveWishes=()=>saveKV('wishes',S.wishes);
 export const saveSettings=()=>saveKV('settings',S.settings);
 
 /* object URLs for images */
@@ -96,14 +97,15 @@ export async function readBackup(file){ /* .zip (version 2) or old .json (versio
   if(sig[0]===0x50&&sig[1]===0x4b){
     const z=await readZip(file),j=z.get('data.json');if(!j)throw new Error('zip sin data.json');
     data=JSON.parse(new TextDecoder().decode(j));
-    for(const it of (Array.isArray(data.items)?data.items:[])){if(typeof it.img==='string'&&!it.img.startsWith('data:')){const b=z.get(it.img);it.img=b?new Blob([b],{type:MIME[it.img.split('.').pop()]||''}):null}}
+    for(const it of [...(Array.isArray(data.items)?data.items:[]),...(Array.isArray(data.wishes)?data.wishes.filter(w=>w&&typeof w==='object'):[])]){if(typeof it.img==='string'&&!it.img.startsWith('data:')){const b=z.get(it.img);it.img=b?new Blob([b],{type:MIME[it.img.split('.').pop()]||''}):null}}
   }else data=JSON.parse(await file.text());
   if(!data||data.app!=='percha'||!Array.isArray(data.items))throw new Error('no es Percha');
   return data;
 }
 export async function exportData(share){
   const files=[],items=S.items.map(({thumb,...it})=>{if(!it.img)return {...it,img:null};const name=`fotos/${it.id}.${EXT[it.img.type]||'bin'}`;files.push({name,blob:it.img});return {...it,img:name}});
-  const data={app:'percha',version:2,exported:new Date().toISOString(),items,pairs:[...S.pairs],blocks:[...S.blocks],rules:S.rules,wears:S.wears,plan:S.plan,favs:S.favs,settings:S.settings};
+  const wishes=S.wishes.map(w=>{if(!w.img)return {...w,img:null};const name=`fotos/deseo-${w.id}.${EXT[w.img.type]||'bin'}`;files.push({name,blob:w.img});return {...w,img:name}});
+  const data={app:'percha',version:2,exported:new Date().toISOString(),items,pairs:[...S.pairs],blocks:[...S.blocks],rules:S.rules,wears:S.wears,plan:S.plan,favs:S.favs,wishes,settings:S.settings};
   files.unshift({name:'data.json',blob:new Blob([JSON.stringify(data)],{type:'application/json'})});
   const blob=await makeZip(files);
   const fname=`percha-copia-${todayISO()}.zip`;
@@ -143,10 +145,18 @@ export function cleanBackup(data){
   const rules=(Array.isArray(data.rules)?data.rules:[]).filter(r=>Array.isArray(r)&&r.length===2&&r.every(isStr));
   const plan={};if(isObj(data.plan))for(const [d,v] of Object.entries(data.plan))if(isDate(d)&&isObj(v)){const o={style:STYLES[v.style]?v.style:undefined},p=pickOutfit(v,ok);for(const k of ['top','bottom','shoes','acc'])if(p[k])o[k]=p[k];if(p.layers.length)o.layers=p.layers;plan[d]=o}
   const favs=[],seenF=new Set();for(const f of (Array.isArray(data.favs)?data.favs:[])){if(!isObj(f)||!isStr(f.id))continue;const o={id:f.id,...pickOutfit(f,ok)};const key=favKey(o);if(!o.top||!o.bottom||!o.shoes||seenF.has(key))continue;seenF.add(key);favs.push(o)}
+  const wishes=[],wid=new Set();
+  for(const r of (Array.isArray(data.wishes)?data.wishes:[])){
+    if(!isObj(r)||!isStr(r.id)||!r.id||wid.has(r.id)||!CATS[r.cat])continue;wid.add(r.id);
+    const price=Number(r.price);
+    wishes.push({id:r.id,name:isStr(r.name)&&r.name.trim()?r.name:CATS[r.cat].label,cat:r.cat,color:isStr(r.color)?r.color:'',
+      styles:Array.isArray(r.styles)?r.styles.filter(x=>STYLES[x]):[],price:price>0?price:null,note:isStr(r.note)?r.note:'',added:isDate(r.added)?r.added:todayISO(),
+      img:r.img instanceof Blob?r.img:isStr(r.img)&&r.img.startsWith('data:')?dataURLToBlob(r.img):null});
+  }
   const st=isObj(data.settings)?data.settings:{},settings={};
   for(const k of Object.keys(S.settings)){if(!(k in st))continue;if(k==='lastExport'){if(st[k]===null||isDate(st[k]))settings[k]=st[k]}else if(typeof st[k]===typeof S.settings[k])settings[k]=st[k]}
   if(!['auto','light','dark'].includes(settings.theme))delete settings.theme;
-  return {items,wears,pairs,blocks,rules,plan,favs,settings};
+  return {items,wears,pairs,blocks,rules,plan,favs,wishes,settings};
 }
 /* datos anteriores a las capas: `outer` → `layers` (registros, plan y favoritos) */
 export async function migrateOutfits(){
@@ -158,9 +168,9 @@ export async function applyImport(raw){
   const data=cleanBackup(raw); /* if anything is wrong this throws and the current data stays */
   for(const s of['items','wears','kv'])await clearStore(s);
   for(const v of URLS.values())URL.revokeObjectURL(v.url);URLS.clear();
-  S.items=data.items;S.pairs=new Set(data.pairs);S.blocks=new Set(data.blocks);S.rules=data.rules;S.wears=data.wears;S.plan=data.plan;S.favs=data.favs;S.settings={...S.settings,...data.settings};
+  S.items=data.items;S.pairs=new Set(data.pairs);S.blocks=new Set(data.blocks);S.rules=data.rules;S.wears=data.wears;S.plan=data.plan;S.favs=data.favs;S.wishes=data.wishes;S.settings={...S.settings,...data.settings};
   for(const it of S.items)await put('items',it);for(const w of S.wears)await put('wears',w);
-  savePairs();saveRules();savePlan();saveFavs();saveSettings();saveKV('seeded',true);computeStats();
+  savePairs();saveRules();savePlan();saveFavs();saveWishes();saveSettings();saveKV('seeded',true);computeStats();
   applyTheme(S.settings.theme||'auto');
   ensureThumbs();
 }

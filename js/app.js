@@ -1,8 +1,8 @@
 /* Percha · app.js — Acciones, eventos y arranque. */
 import {$,SLOTS,diffDays,favKey,keyOutfit,outfitIds,pairKey,pickOutfit,todayISO,uid} from './datos.js';
-import {S,applyImport,cleanBackup,clearStore,db,del,dropURLs,ensureThumbs,exportData,get,getAll,idbOpen,migrateOutfits,put,readBackup,saveFavs,saveKV,savePairs,savePlan,saveRules,saveSettings,seedDemo,setDb} from './almacen.js';
+import {S,applyImport,cleanBackup,clearStore,db,del,dropURLs,ensureThumbs,exportData,get,getAll,idbOpen,migrateOutfits,put,readBackup,saveFavs,saveKV,saveWishes,savePairs,savePlan,saveRules,saveSettings,seedDemo,setDb} from './almacen.js';
 import {combos,compatible,computeStats,generate,lastOf,weekDates} from './motor.js';
-import {D,applyTheme,armBar,armBody,armList,closeSheet,compatSheet,daySheet,detailSheet,drawEdit,editSheet,favSheet,guideSheet,layerSheet,loadPhoto,pickerSheet,processPhoto,refreshSheet,render,saveItem,setD,settingsSheet,syncColor,toast,updatePreview} from './vistas.js';
+import {D,applyTheme,armBar,armBody,armList,closeSheet,compatSheet,daySheet,detailSheet,drawEdit,editSheet,favSheet,guideSheet,wishSheet,wishEdit,wishCancel,wishSave,wishDelete,wishSet,wishColorSync,wishPhoto,layerSheet,loadPhoto,pickerSheet,processPhoto,refreshSheet,render,saveItem,setD,settingsSheet,syncColor,toast,updatePreview} from './vistas.js';
 
 export let pendingImport=null,deferredInstall=null,confirmWipe=false;
 window.addEventListener('beforeinstallprompt',e=>{deferredInstall=e});window.addEventListener('appinstalled',()=>{deferredInstall=null;toast('Percha instalada')});
@@ -102,6 +102,14 @@ export const A={
   armDelDo:async()=>{const ids=[...S.armSel];for(const id of ids)await deleteItem(id);S.armSel=null;S.armDel=false;render();toast(ids.length===1?'Prenda eliminada':ids.length+' prendas eliminadas')},
   armLaundry:()=>{S.armLaundry=!S.armLaundry;render()},
   allClean:async()=>{for(const it of S.items.filter(i=>i.laundry)){it.laundry=false;await put('items',it)}S.armLaundry=false;render();toast('Todo limpio')},
+  wishSheet:()=>wishSheet(),
+  wishNew:()=>wishEdit(),
+  wishOpen:d=>wishEdit(d.id),
+  wishCancel:()=>wishCancel(),
+  wishSave:()=>wishSave(),
+  wishDel:()=>wishDelete(),
+  wseg:(d,el)=>wishSet(d.f,d.v,el),
+  wcolor:d=>wishColorSync(d.v),
   detail:d=>detailSheet(d.id),
   editItem:d=>editSheet(d.id),
   cancelEdit:()=>{const id=D&&!D.isNew?D.id:null;setD(null);id?detailSheet(id):closeSheet()},
@@ -146,13 +154,15 @@ export const A={
   importCancel:()=>{pendingImport=null;refreshSheet()},
   wipeAsk:()=>{confirmWipe=true;refreshSheet()},
   wipeCancel:()=>{confirmWipe=false;refreshSheet()},
-  wipeDo:async()=>{for(const s of['items','wears'])await clearStore(s);await clearStore('kv');await saveKV('seeded',true);Object.assign(S.settings,{season:'auto',noRepeat:3,forgotten:21,lastExport:null,suggest:true,suggestLevel:'wide'});saveSettings();/* el tema se conserva a propósito */S.items=[];S.pairs=new Set();S.blocks=new Set();S.rules=[];S.wears=[];S.plan={};S.favs=[];resetFlow();computeStats();confirmWipe=false;closeSheet();toast('Datos borrados')}
+  wipeDo:async()=>{for(const s of['items','wears'])await clearStore(s);await clearStore('kv');await saveKV('seeded',true);Object.assign(S.settings,{season:'auto',noRepeat:3,forgotten:21,lastExport:null,suggest:true,suggestLevel:'wide'});saveSettings();/* el tema se conserva a propósito */S.items=[];S.pairs=new Set();S.blocks=new Set();S.rules=[];S.wears=[];S.plan={};S.favs=[];S.wishes=[];resetFlow();computeStats();confirmWipe=false;closeSheet();toast('Datos borrados')}
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=A[el.dataset.act];if(f)f(el.dataset,el,e)});
 document.addEventListener('toggle',e=>{if(e.target.id==='f-more'&&D)D.more=e.target.open},true);
 document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.input;if(k==='armQ'){S.armQ=e.target.value;const b=$('#arm-body');if(b)b.innerHTML=armBody();return}if(!k||!D)return;if(k==='tol'){D.tol=+e.target.value;clearTimeout(D._t);D._t=setTimeout(processPhoto,140)}else D[k]=e.target.value});
+document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.winput;if(k)wishSet(k,e.target.value)});
 document.addEventListener('change',async e=>{
   const t=e.target;
+  if(t.id==='w-photo'){const f=t.files&&t.files[0];t.value='';if(f)wishPhoto(f);return}
   if(t.id==='f-photo'){const fs=[...(t.files||[])];t.value='';if(!fs.length||!D)return;if(D.isNew&&fs.length>1&&!D.qTotal){D.queue=fs.slice(1);D.qTotal=fs.length;D.qIndex=1;D.qDone=0}loadPhoto(fs[0]);return}
   if(t.id==='imp-file'){const f=t.files&&t.files[0];t.value='';if(!f)return;try{const d=await readBackup(f);cleanBackup(d);pendingImport=d;refreshSheet()}catch(err){console.warn(err);toast('Ese archivo no es una copia de Percha')}return}
   if(t.dataset.change==='armSort'){S.armSort=t.value;render()}
@@ -167,7 +177,7 @@ export async function boot(){
   if(db){
     S.items=(await getAll('items'))||[];S.wears=(await getAll('wears'))||[];
     const kv=Object.fromEntries(((await getAll('kv'))||[]).map(r=>[r.id,r.v]));
-    S.pairs=new Set(kv.pairs||[]);S.blocks=new Set(kv.blocks||[]);S.rules=kv.rules||[];S.plan=kv.plan||{};S.favs=kv.favs||[];Object.assign(S.settings,kv.settings||{});seeded=!!kv.seeded;
+    S.pairs=new Set(kv.pairs||[]);S.blocks=new Set(kv.blocks||[]);S.rules=kv.rules||[];S.plan=kv.plan||{};S.favs=kv.favs||[];S.wishes=kv.wishes||[];Object.assign(S.settings,kv.settings||{});seeded=!!kv.seeded;
     await migrateOutfits();
   }
   if(!seeded)await seedDemo();

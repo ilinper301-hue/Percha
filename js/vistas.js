@@ -1,6 +1,6 @@
 /* Percha · vistas.js — Tema, toast, hojas y pantallas (Hoy, Armario, Semana, Datos, fichas, ajustes). */
 import {$,BS,CATS,addDays,favKey,layersOf,outfitIds,CAT_ORDER,COLORS,DOW,DOWS,MON,MONS,SEASONS,STYLES,TB,ago,agoShort,cap,defaultKind,diffDays,esc,euro,fmtLong,fmtShort,garmentSVG,ic,pairKey,parseD,related,svgBlob,svgDataURL,swatchBg,todayISO,uid} from './datos.js';
-import {CAN_SHARE,IMG_MAX,S,THUMB_MAX,del,encodeCanvas,get,imgTag,mini,put,savePairs,scaleCanvas,urlFor} from './almacen.js';
+import {CAN_SHARE,IMG_MAX,S,THUMB_MAX,blobToCanvas,del,dropURLs,encodeCanvas,get,imgTag,mini,put,savePairs,saveWishes,scaleCanvas,urlFor} from './almacen.js';
 import {available,byFresh,combos,compatReason,compatible,computeStats,currentSeason,forgottenList,hasDemo,lastOf,outfitOK,suggestScore,usesOf,weekDates} from './motor.js';
 import {confirmWipe,deferredInstall,pendingImport} from './app.js';
 
@@ -37,7 +37,7 @@ export function openSheet(html,{tall=false,refresh=null}={}){
   if(!sheetPushed){try{history.pushState({sheet:1},'');sheetPushed=true}catch(e){}}
   return scrim.querySelector('.sheet');
 }
-export function closeSheet(fromPop){const scrim=$('.scrim');sheetRefresh=null;D=null;if(scrim){scrim.classList.remove('open');setTimeout(()=>scrim.remove(),200)}if(sheetPushed&&!fromPop){sheetPushed=false;ignorePop=true;try{history.back()}catch(e){ignorePop=false}}else sheetPushed=false;render()}
+export function closeSheet(fromPop){const scrim=$('.scrim');sheetRefresh=null;D=null;W=null;if(scrim){scrim.classList.remove('open');setTimeout(()=>scrim.remove(),200)}if(sheetPushed&&!fromPop){sheetPushed=false;ignorePop=true;try{history.back()}catch(e){ignorePop=false}}else sheetPushed=false;render()}
 window.addEventListener('popstate',()=>{if(ignorePop){ignorePop=false;return}if($('.scrim')){sheetPushed=false;closeSheet(true)}});
 export const sheetHead=(title,left,right)=>`<div class="sh-head gut">${left||'<button class="link" data-act="closeSheet">Cerrar</button>'}<h2>${esc(title)}</h2>${right||'<span></span>'}</div>`;
 export function refreshSheet(){if(sheetRefresh){const sh=$('.sheet');const body=sh&&sh.querySelector('.sh-body');const top=body?body.scrollTop:0;sheetRefresh();const nb=$('.sheet .sh-body');if(nb)nb.scrollTop=top}}
@@ -154,7 +154,7 @@ export function armBar(){
 export function viewArmario(){
   const cnt=c=>S.items.filter(i=>i.cat===c).length;
   const laundryN=S.items.filter(i=>i.laundry).length,nf=armFilters();
-  let h=demoBanner()+`<div class="row between" style="margin-top:10px"><h1 class="h1" style="margin:0">Armario</h1><span class="sub num">${S.items.length} prendas</span></div>`;
+  let h=demoBanner()+`<div class="row between" style="margin-top:10px"><h1 class="h1" style="margin:0">Armario</h1><span class="sub num">${S.items.length} prendas</span></div><div class="row" style="justify-content:flex-end;margin-top:2px"><button class="link" data-act="wishSheet">${ic('heart',16,1.8)} Deseos${S.wishes.length?` (${S.wishes.length})`:''}</button></div>`;
   h+=`<div class="chips" style="margin-top:14px">${CAT_ORDER.map(c=>`<button class="pill${S.armCat===c?' on':''}" data-act="armCat" data-v="${c}">${CATS[c].plural}<span class="c num">${cnt(c)}</span></button>`).join('')}</div>`;
   h+=`<div class="row" style="margin-top:12px;flex-wrap:nowrap"><input class="input" id="arm-q" type="search" data-input="armQ" placeholder="Buscar por nombre" aria-label="Buscar por nombre" value="${esc(S.armQ)}" autocomplete="off" style="flex:1;min-width:0"><button class="pill${nf||S.armFilt?' on':''}" data-act="armFilt">Filtros${nf?`<span class="c num">${nf}</span>`:''}</button></div>`;
   if(S.armFilt){
@@ -470,3 +470,73 @@ export function guideSheet(){
   openSheet(h,{tall:true});
 }
 export function setD(v){D=v}
+
+/* ----- lista de deseos ----- */
+export let W=null;
+const wishImg=w=>w.img?urlFor(w):svgDataURL(garmentSVG(defaultKind[w.cat],w.color));
+export function wishSheet(){
+  W=null;
+  let h=sheetHead('Deseos','<button class="link" data-act="closeSheet">Cerrar</button>','<button class="link strong" data-act="wishNew">Añadir</button>')+`<div class="sh-body gut">`;
+  h+=S.wishes.length?`<p class="sub" style="margin:0 0 12px">Lo que te gustaría tener. Toca uno para editarlo.</p><div class="stack">`+S.wishes.map(w=>`<button class="favrow wish" data-act="wishOpen" data-id="${w.id}"><span class="mini"><img src="${wishImg(w)}" alt="" class="${w.img?'cover':''}"></span><span class="favn"><b>${esc(w.name)}</b><br><span style="color:var(--muted)">${CATS[w.cat].label}${w.color?' · '+cap(w.color):''}${w.price?' · '+euro(w.price):''}</span>${w.note?`<br><span style="color:var(--muted)">${esc(w.note)}</span>`:''}</span></button>`).join('')+`</div>`:`<p class="hint">Aún no tienes deseos. Pulsa «Añadir» para apuntar una prenda que te gustaría comprar.</p>`;
+  openSheet(h+`</div>`,{tall:true,refresh:wishSheet});
+}
+export function wishEdit(id){
+  const w=S.wishes.find(x=>x.id===id);
+  W=w?{...w,styles:[...(w.styles||[])],price:w.price??'',isNew:false,changed:false}:{id:uid(),name:'',cat:'top',color:'',styles:[],price:'',note:'',img:null,isNew:true,changed:false};
+  drawWish();
+}
+export function drawWish(){
+  const segs=(field,opts,multi)=>`<div class="seg">${opts.map(([k,l])=>`<button type="button" class="pill${(multi?W[field].includes(k):W[field]===k)?' on':''}" data-act="wseg" data-f="${field}" data-v="${k}">${l}</button>`).join('')}</div>`;
+  let h=sheetHead(W.isNew?'Nuevo deseo':'Editar deseo','<button class="link" data-act="wishCancel">Cancelar</button>','<button class="link strong" data-act="wishSave">Guardar</button>')+`<div class="sh-body gut">`;
+  h+=`<label class="photo${W.img?' has':''}" for="w-photo" id="w-box"><img id="w-prev" alt="" src="${wishPrev()}" class="${W.img?'cover':''}"><span class="ov">${ic('camera',16,1.8)}${W.img?'Cambiar foto':'Añadir foto (opcional)'}</span></label><input type="file" id="w-photo" accept="image/*" hidden>`;
+  h+=`<div class="field"><label class="label" for="w-name">Nombre</label><input class="input" id="w-name" data-winput="name" value="${esc(W.name)}" placeholder="Jersey de lana gris" autocomplete="off"></div>`;
+  h+=`<div class="field"><span class="label">Categoría</span>${segs('cat',CAT_ORDER.map(c=>[c,CATS[c].label]))}</div>`;
+  h+=`<div class="field"><span class="label">Color <span id="w-color-name" style="text-transform:none;letter-spacing:0;color:var(--fg)">${W.color?'· '+cap(W.color):''}</span></span><div class="sw">${COLORS.map(([n])=>`<button type="button" class="swc${W.color===n?' on':''}" data-act="wcolor" data-v="${n}" style="background:${swatchBg(n)}" aria-label="${n}"></button>`).join('')}</div></div>`;
+  h+=`<div class="field"><span class="label">Estilo</span>${segs('styles',Object.entries(STYLES),true)}</div>`;
+  h+=`<div class="field"><label class="label" for="w-price">Precio estimado <span style="text-transform:none;letter-spacing:0">(opcional)</span></label><input class="input" id="w-price" data-winput="price" inputmode="decimal" value="${W.price??''}" placeholder="40"></div>`;
+  h+=`<div class="field"><label class="label" for="w-note">Nota <span style="text-transform:none;letter-spacing:0">(opcional)</span></label><input class="input" id="w-note" data-winput="note" value="${esc(W.note||'')}" placeholder="Tienda, enlace, talla…" autocomplete="off"></div>`;
+  if(!W.isNew)h+=`<button class="btn ghost block" data-act="wishDel" style="margin-top:8px">Quitar de deseos</button>`;
+  openSheet(h+`</div>`,{tall:true});
+}
+function wishPrev(){
+  if(W.img){if(W._pu&&W._pb===W.img)return W._pu;if(W._pu)URL.revokeObjectURL(W._pu);W._pb=W.img;W._pu=URL.createObjectURL(W.img);return W._pu}
+  return svgDataURL(garmentSVG(defaultKind[W.cat],W.color));
+}
+export function wishSet(f,v,el){
+  if(!W)return;
+  if(f==='styles'){const i=W.styles.indexOf(v);if(i>=0)W.styles.splice(i,1);else W.styles.push(v);el&&el.classList.toggle('on')}
+  else if(f==='cat'){W.cat=v;drawWish()}
+  else W[f]=v;
+  W.changed=true;
+  if(f==='cat'||f==='color'){const im=$('#w-prev');if(im&&!W.img)im.src=wishPrev()}
+}
+export function wishColorSync(c){
+  if(!W)return;W.color=W.color===c?'':c;W.changed=true;
+  document.querySelectorAll('.sheet .swc').forEach(b=>b.classList.toggle('on',b.dataset.v===W.color));
+  const n=$('#w-color-name');if(n)n.textContent=W.color?'· '+cap(W.color):'';
+  const im=$('#w-prev');if(im&&!W.img)im.src=wishPrev();
+}
+export async function wishPhoto(file){
+  if(!W)return;const box=$('#w-box');box&&box.classList.add('busy');
+  try{
+    const c=await blobToCanvas(file);W.img=await encodeCanvas(scaleCanvas(c,480),true);W.changed=true;
+    const im=$('#w-prev');if(im){im.src=wishPrev();im.className='cover'}
+    if(box)box.classList.add('has');const ov=box&&box.querySelector('.ov');if(ov)ov.lastChild.textContent='Cambiar foto';
+  }catch(e){console.warn(e);toast('No se pudo leer esa foto')}
+  box&&box.classList.remove('busy');
+}
+export function wishCancel(){if(W&&W._pu)URL.revokeObjectURL(W._pu);wishSheet()}
+export async function wishSave(){
+  if(!W)return;
+  const name=(W.name||'').trim();if(!name){toast('Ponle un nombre');const i=$('#w-name');i&&i.focus();return}
+  const price=Number(String(W.price).replace(',','.'));
+  const w={id:W.id,name,cat:W.cat,color:W.color||'',styles:[...W.styles],price:price>0?price:null,note:(W.note||'').trim(),img:W.img||null,added:W.added||todayISO()};
+  const i=S.wishes.findIndex(x=>x.id===w.id);if(i>=0)S.wishes[i]=w;else S.wishes.push(w);
+  dropURLs(w.id);if(W._pu)URL.revokeObjectURL(W._pu);
+  await saveWishes();toast('Deseo guardado');wishSheet();
+}
+export async function wishDelete(){
+  if(!W)return;const old=S.wishes.find(x=>x.id===W.id);if(!old)return;
+  S.wishes=S.wishes.filter(x=>x!==old);await saveWishes();wishSheet();
+  toast('Deseo quitado',{label:'Deshacer',fn:async()=>{S.wishes.push(old);await saveWishes();if($('.scrim'))refreshSheet();else render()}});
+}
