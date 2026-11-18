@@ -1,0 +1,56 @@
+# Plan de mejoras de Percha
+
+Análisis hecho el 13-11-2026 sobre el commit `6d46a73`. Cada tarea tiene una casilla: márcala `[x]` al terminarla y añade una línea en el **Registro** del final.
+
+Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abajo.
+
+---
+
+## Fase 1 · Fotos y copia de seguridad (lo más urgente)
+
+- [ ] **1.1 Miniaturas aparte.** Hoy cada prenda guarda una sola imagen de hasta 1000 px (`loadPhoto`, `processPhoto`) y se usa también en miniaturas de 28-52 px. Guardar `img` (≈800 px) + `thumb` (≈200 px) y usar `thumb` en `mini()`, rejillas y semana. Migrar las prendas existentes al arrancar (generar `thumb` si falta).
+- [ ] **1.2 WebP.** Codificar en `image/webp` (con transparencia si se quitó el fondo) y caer a PNG/JPEG si el navegador no lo admite (`canvas.toBlob` devuelve otro tipo).
+- [ ] **1.3 Copia en ZIP.** `exportData` mete todas las fotos en base64 dentro de un único JSON: con 100+ prendas puede agotar la memoria del móvil. Pasar a ZIP (`data.json` + carpeta `fotos/`) con un compresor mínimo propio (formato ZIP "store", sin dependencias). Mantener la importación del JSON antiguo.
+- [ ] **1.4 Compartir la copia.** Usar `navigator.share({files:[...]})` cuando exista (para mandarla a Drive, WhatsApp, etc.) y la descarga como alternativa.
+- [ ] **1.5 Importación robusta.** Validar estructura y tipos en `applyImport`, no borrar nada hasta que la copia se haya leído entera, y aplicar el tema importado (`applyTheme`).
+
+## Fase 2 · Añadir prendas más rápido
+
+- [ ] **2.1 Alta múltiple.** Permitir elegir varias fotos a la vez (`multiple` en `#f-photo`) y crear una cola: se revisa cada prenda en una hoja corta (nombre, categoría, color) con "Siguiente".
+- [ ] **2.2 Color automático.** Detectar el color dominante de la foto (ignorando el fondo quitado) y proponer el más cercano de `COLORS`. El usuario puede corregirlo.
+- [ ] **2.3 Formulario más corto.** En `drawEdit`, dejar visibles foto, nombre, categoría y color; plegar estilo, temporada, precio y comodín en "Más detalles".
+
+## Fase 3 · Estructura del código
+
+- [ ] **3.1 Separar `index.html` (97 KB) en archivos.** Propuesta: `styles.css`, `js/datos.js` (constantes, guía de color), `js/almacen.js` (IndexedDB, copia), `js/motor.js` (compatibilidad, combos, generar semana), `js/vistas.js` (Hoy, Armario, Semana, Datos, hojas), `js/app.js` (acciones y arranque). Módulos ES (`type="module"`), sin herramientas de compilación. Actualizar la lista `CORE` de `sw.js`.
+- [ ] **3.2 Service worker.** Para la navegación, red con límite de 3 s y si no, caché (hoy espera indefinidamente con mala cobertura). Subir versión de caché y avisar con un toast "Hay una versión nueva · Recargar".
+- [ ] **3.3 Fuentes locales.** Servir Geist y Source Serif 4 desde el repo (woff2, solo los pesos usados) en vez de Google Fonts.
+- [ ] **3.4 Fallos menores.**
+  - Al borrar una prenda, limpiar también sus entradas de `S.blocks` (`deleteItem`, `clearDemo`).
+  - Si la app queda abierta y cambia el día, recalcular "Hoy" (`visibilitychange` → `render()`).
+  - `wipeDo` debería borrar también el tema guardado en `localStorage` o mantenerlo de forma explícita.
+
+## Fase 4 · Diseño e interfaz
+
+- [ ] **4.1 Tamaños táctiles.** Mínimo 44×44 px en enlaces (`.link`), muestras de color (`.swc`, hoy 32 px) y botones del `stepper`.
+- [ ] **4.2 Contraste.** Pestañas inactivas (`--faint` sobre `--bg`, ≈2,3:1) → usar `--muted` (≥4,5:1). Revisar también `.pill .c` y textos `--faint`.
+- [ ] **4.3 Acción principal coherente.** Hoy alterna verde (`.btn.primary`) y negro (`.btn.dark`). Regla: verde = acción principal de la pantalla; negro solo para el FAB.
+- [ ] **4.4 Cerrar hojas deslizando.** El tirador (`.grab`) no hace nada: arrastrar hacia abajo la cabecera de la hoja para cerrarla.
+- [ ] **4.5 Armario: buscar y filtrar.** Buscador por nombre, filtros por color y estilo, y selección múltiple (mandar al cesto, borrar).
+- [ ] **4.6 Outfit desde una prenda.** En la ficha (`detailSheet`), botón "Crear outfit con esta prenda" que arranque el flujo con esa prenda ya elegida en su paso.
+- [ ] **4.7 Tarjeta de outfit.** Con fotos recortadas en cuadrado (`fit:'cover'`) el flat lay parece una pila de cuadrados: usar formas redondeadas con fondo `--tile` y mejor proporción entre arriba, abajo y calzado.
+- [ ] **4.8 Datos con gráficas.** Reparto por color y por categoría, y usos por semana en las últimas 8 semanas.
+
+## Ideas para más adelante (no prioritarias)
+
+- Varios outfits por día o registrar días pasados desde Semana.
+- Capas (camisa + jersey) y outfits favoritos guardados.
+- Lista de deseos / prendas que faltan para completar combinaciones.
+
+---
+
+## Registro
+
+| Fecha | Tarea | Notas |
+|---|---|---|
+| 13-11-2026 | Análisis | Plan creado. Nada implementado todavía. |
