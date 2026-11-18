@@ -23,6 +23,8 @@ Si una tarea es grande, divídela y completa solo una parte por sesión, dejánd
 
 ## Notas técnicas
 
-- Todo el código está en `index.html` hasta que se haga la tarea 3.1.
+- Estructura (módulos ES, sin compilación): `index.html` (marcado) · `styles.css` · `js/datos.js` (constantes, utilidades, iconos, ilustraciones, guía de color) · `js/almacen.js` (estado `S`, IndexedDB, imágenes, copia ZIP/JSON, armario de ejemplo) · `js/motor.js` (estadísticas, compatibilidad, combinaciones, generar semana) · `js/vistas.js` (tema, toast, hojas, pantallas, alta/edición de prendas, ajustes) · `js/app.js` (acciones `A`, eventos y arranque).
+- Los `let` exportados no se pueden reasignar desde otro módulo: usa un setter (`setD`, `setDb`) o declara la variable donde se asigna. Al usar una función de otro módulo, añádela a su `import`.
+- Si añades un archivo, inclúyelo en `CORE` de `sw.js`.
 - Al cambiar archivos que cachea el service worker, sube la versión `CACHE` en `sw.js`.
 - No romper la compatibilidad con copias de seguridad: JSON antiguo (`app:'percha', version:1`, fotos en data URL) y ZIP actual (`version:2`, `data.json` + `fotos/`).
