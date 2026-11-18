@@ -19,7 +19,7 @@ export async function recordWear(o,date){
   const w={id:uid(),date,at:new Date().toISOString(),...oo};
   S.wears.push(w);await put('wears',w);computeStats();return 'new';
 }
-const wornMsg=r=>r==='dup'?'Ese outfit ya estaba registrado hoy':'Registrado. Buen día.';
+const wornMsg=(r,past)=>r==='dup'?'Ese outfit ya estaba registrado '+(past?'ese día':'hoy'):past?'Outfit registrado':'Registrado. Buen día.';
 /* quita de los favoritos las prendas borradas; si falta una principal, el favorito se elimina */
 function dropFavs(ids){
   S.favs=S.favs.map(f=>({id:f.id,...pickOutfit(f,id=>!ids.has(id))})).filter(f=>f.top&&f.bottom&&f.shoes);saveFavs();
@@ -84,6 +84,7 @@ export const A={
   confirmOutfit:async()=>{
     const f=S.flow,t=todayISO(),target=f.target||t,o=pickOutfit(f);
     if(target===t){const r=await recordWear(o,t);if(S.plan[t])S.plan[t]={...S.plan[t],...o};savePlan();resetFlow();S.view='hoy';render();scrollTop();toast(wornMsg(r))}
+    else if(target<t){const r=await recordWear(o,target);resetFlow();S.view='semana';render();scrollTop();toast(wornMsg(r,true))}
     else{S.plan[target]={...o,style:(S.plan[target]||{}).style||'',locked:true};savePlan();resetFlow();S.view='semana';render();toast('Guardado y bloqueado en el plan')}
   },
   undoToday:async d=>{const w=S.wears.find(x=>x.id===d.id);if(!w)return;S.wears=S.wears.filter(x=>x!==w);await del('wears',w.id);computeStats();render();toast('Outfit quitado de hoy',{label:'Deshacer',fn:async()=>{S.wears.push(w);await put('wears',w);computeStats();render()}})},
@@ -136,11 +137,12 @@ export const A={
   dayStyle:d=>{S.plan[d.date]={...(S.plan[d.date]||{}),style:d.v};const p=S.plan[d.date];if(p.top&&!p.locked&&d.v){const ok=['top','bottom','shoes'].every(k=>(get(p[k])?.styles||[]).includes(d.v));if(!ok)generate([d.date])}savePlan();refreshSheet()},
   dayLock:d=>{const p=S.plan[d.date];if(!p)return;p.locked=!p.locked;savePlan();refreshSheet()},
   dayRegen:d=>{const p=S.plan[d.date]||{};const was=p.locked;S.plan[d.date]={style:p.style||''};const f=generate([d.date]);if(was&&S.plan[d.date].top)S.plan[d.date].locked=true;savePlan();refreshSheet();if(f)toast('No hay combinaciones para este estilo')},
+  dayWear:d=>{resetFlow();S.flow.target=d.date;S.flow.active=true;S.view='hoy';closeSheet();scrollTop()},
   dayManual:d=>{resetFlow();S.flow.target=d.date;S.flow.active=true;S.view='hoy';closeSheet();scrollTop()},
   dayClear:d=>{const p=S.plan[d.date];S.plan[d.date]={style:p?.style||''};savePlan();closeSheet()},
   // datos
   dataCat:d=>{S.dataCat=d.v;render()},
-  delWear:async d=>{const w=S.wears.find(x=>x.id===d.id);if(!w)return;S.wears=S.wears.filter(x=>x!==w);await del('wears',w.id);computeStats();render();toast('Registro borrado',{label:'Deshacer',fn:async()=>{S.wears.push(w);await put('wears',w);computeStats();render()}})},
+  delWear:async d=>{const w=S.wears.find(x=>x.id===d.id);if(!w)return;S.wears=S.wears.filter(x=>x!==w);await del('wears',w.id);computeStats();render();refreshSheet();toast('Registro borrado',{label:'Deshacer',fn:async()=>{S.wears.push(w);await put('wears',w);computeStats();render();refreshSheet()}})},
   // settings
   install:async()=>{if(!deferredInstall)return;deferredInstall.prompt();try{await deferredInstall.userChoice}catch(e){}deferredInstall=null;refreshSheet()},
   setSeason:d=>{S.settings.season=d.v;saveSettings();refreshSheet()},
