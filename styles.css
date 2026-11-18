@@ -65,7 +65,7 @@ main{box-sizing:border-box;height:100%;overflow-y:auto;overscroll-behavior:conta
 .btn.small{padding:7px 12px;font-size:13.5px;border-radius:10px}
 .btn.block{width:100%}
 .btn[disabled]{opacity:.45;pointer-events:none}
-.link{all:unset;cursor:pointer;color:var(--muted);font-size:14.5px;padding:6px 4px}
+.link{all:unset;cursor:pointer;color:var(--muted);font-size:14.5px;padding:0 6px;min-height:44px;min-width:44px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}
 .link.strong{color:var(--accent);font-weight:600}
 .link:focus-visible{outline:2px solid var(--accent)}
 
@@ -227,8 +227,9 @@ details.others .hint{margin:8px 0 14px}
 .photo.has img.cover{max-width:100%;max-height:100%;width:100%;height:100%;object-fit:cover}
 .photo .ov{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:var(--bg);color:var(--fg);font-size:13px;font-weight:500;padding:7px 12px;border-radius:999px;display:flex;gap:6px;align-items:center;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,.08)}
 .photo.busy::after{content:"Procesando…";position:absolute;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 70%,transparent);font-size:14px;color:var(--muted)}
-.sw{display:flex;flex-wrap:wrap;gap:10px}
-.swc{appearance:none;width:32px;height:32px;border-radius:50%;border:1px solid rgba(0,0,0,.12);cursor:pointer;padding:0;outline:2px solid transparent;outline-offset:2px}
+.sw{display:flex;flex-wrap:wrap;gap:12px}
+.swc{appearance:none;width:32px;height:32px;border-radius:50%;border:1px solid rgba(0,0,0,.12);cursor:pointer;padding:0;position:relative;outline:2px solid transparent;outline-offset:2px}
+.swc::before{content:'';position:absolute;inset:-7px}
 .swc.on{outline-color:var(--fg)}
 .swc:focus-visible{outline-color:var(--accent)}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.12);vertical-align:-1px}
@@ -264,7 +265,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .setrow p{margin:0}
 .setrow small{display:block;color:var(--muted);font-size:12.5px}
 .stepper{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:12px;padding:2px}
-.stepper button{all:unset;cursor:pointer;width:32px;height:32px;display:grid;place-items:center;border-radius:9px;color:var(--muted);font-size:18px}
+.stepper button{all:unset;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;border-radius:9px;color:var(--muted);font-size:18px}
 .stepper button:active{background:var(--sunk)}
 .stepper span{min-width:28px;text-align:center;font-variant-numeric:tabular-nums;font-weight:500}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:4px 16px}

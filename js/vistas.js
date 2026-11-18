@@ -67,7 +67,7 @@ export function viewHoy(){
 export function flowHTML(target){
   const f=S.flow,step=f.step,t=todayISO(),isToday=target===t;
   const d=parseD(target);
-  let h=`<p class="eyebrow">${fmtLong(target)}${f.target?` · <button class="link" style="font-size:13px;padding:0" data-act="cancelTarget">Cancelar</button>`:''}</p>`;
+  let h=`<p class="eyebrow">${fmtLong(target)}${f.target?` · <button class="link" style="font-size:13px;padding:0 6px;margin:-14px 0" data-act="cancelTarget">Cancelar</button>`:''}</p>`;
   h+=`<h1 class="h1">${isToday?'¿Qué te pones hoy?':'Outfit para el '+DOW[d.getDay()]+' '+d.getDate()}</h1>`;
   h+=`<div class="prog" aria-label="Paso ${Math.min(step+1,3)} de 3">${[0,1,2].map(i=>`<i class="${i<step?'done':i===step?'cur':''}"></i>`).join('')}</div>`;
   const ks=['top','bottom','shoes'];
