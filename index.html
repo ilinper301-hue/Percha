@@ -419,9 +419,19 @@ const saveSettings=()=>saveKV('settings',S.settings);
 
 /* object URLs for images */
 const URLS=new Map();
-function urlFor(it){if(!it||!it.img)return '';const c=URLS.get(it.id);if(c&&c.blob===it.img)return c.url;if(c)URL.revokeObjectURL(c.url);const url=URL.createObjectURL(it.img);URLS.set(it.id,{blob:it.img,url});return url}
-const imgTag=it=>it?`<img src="${urlFor(it)}" alt="" loading="lazy" class="${it.fit==='cover'?'cover':''}">`:'';
-const mini=(it,extra='')=>`<span class="mini" ${extra}>${it?imgTag(it):''}</span>`;
+function urlFor(it,small){if(!it)return '';const b=small&&it.thumb?it.thumb:it.img;if(!b)return '';const key=it.id+(b===it.thumb?'#t':'');const c=URLS.get(key);if(c&&c.blob===b)return c.url;if(c)URL.revokeObjectURL(c.url);const url=URL.createObjectURL(b);URLS.set(key,{blob:b,url});return url}
+function dropURLs(id){for(const k of [id,id+'#t']){const u=URLS.get(k);if(u){URL.revokeObjectURL(u.url);URLS.delete(k)}}}
+const imgTag=(it,small)=>it?`<img src="${urlFor(it,small)}" alt="" loading="lazy" class="${it.fit==='cover'?'cover':''}">`:'';
+const mini=(it,extra='')=>`<span class="mini" ${extra}>${it?imgTag(it,true):''}</span>`;
+
+/* image sizes: full photo for detail and outfit card, thumbnail for lists and grids */
+const IMG_MAX=800,THUMB_MAX=320;
+function scaleCanvas(src,max){const s=Math.min(1,max/Math.max(src.width,src.height));if(s===1)return src;const c=document.createElement('canvas');c.width=Math.max(1,Math.round(src.width*s));c.height=Math.max(1,Math.round(src.height*s));const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(src,0,0,c.width,c.height);return c}
+const encodeCanvas=(c,alpha)=>new Promise(r=>c.toBlob(r,alpha?'image/png':'image/jpeg',.86));
+async function blobToCanvas(b){const url=URL.createObjectURL(b);try{const im=new Image();await new Promise((r,j)=>{im.onload=r;im.onerror=j;im.src=url});const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.getContext('2d').drawImage(im,0,0);return c}finally{URL.revokeObjectURL(url)}}
+async function makeThumb(blob,alpha){const c=await blobToCanvas(blob);return encodeCanvas(scaleCanvas(c,THUMB_MAX),alpha)}
+const needsThumb=it=>!it.illus&&it.img&&!it.thumb;
+async function ensureThumbs(){let n=0;for(const it of S.items){if(!needsThumb(it))continue;try{it.thumb=await makeThumb(it.img,it.fit!=='cover');await put('items',it);n++}catch(e){console.warn(e)}}if(n&&!$('.scrim'))render();return n}
 
 /* ---------- logic ---------- */
 function computeStats(){ST={};for(const it of S.items)ST[it.id]={uses:0,last:null};for(const w of S.wears)for(const k of SLOTS){const id=w[k];if(id&&ST[id]){ST[id].uses++;if(!ST[id].last||w.date>ST[id].last)ST[id].last=w.date}}}
@@ -591,7 +601,7 @@ function tile(it,{act='detail',sel=false,dim=false,meta=true,extra='',check='',s
   const u=usesOf(it.id);
   const corner=sug?'<span class="badge r sug">Sugerida</span>':it.wild&&meta?'<span class="badge r">Comodín</span>':'';
   const line=sub!==null?`<span class="tm">${sub||'&nbsp;'}</span>`:meta?`<span class="tm">${u} ${u===1?'uso':'usos'} · ${ago(lastOf(it.id))}</span>`:'';
-  return `<button class="tile${sel?' sel':''}${dim?' dim':''}${extra}" data-act="${act}" data-id="${it.id}"${base?` data-base="${base}"`:''}><span class="ph">${imgTag(it)}${it.laundry?'<span class="badge">En el cesto</span>':''}${corner}${check}</span><span class="tn">${esc(it.name)}</span>${line}</button>`;
+  return `<button class="tile${sel?' sel':''}${dim?' dim':''}${extra}" data-act="${act}" data-id="${it.id}"${base?` data-base="${base}"`:''}><span class="ph">${imgTag(it,true)}${it.laundry?'<span class="badge">En el cesto</span>':''}${corner}${check}</span><span class="tn">${esc(it.name)}</span>${line}</button>`;
 }
 
 /* ----- ARMARIO ----- */
@@ -657,7 +667,7 @@ function viewDatos(){
   const real=S.items.some(i=>!i.demo);const le=S.settings.lastExport;
   if(real&&(!le||diffDays(t,le)>30))h+=`<div class="banner" style="margin-top:16px"><p>${le?'Tu última copia es de hace '+diffDays(t,le)+' días.':'Aún no has hecho ninguna copia de seguridad.'}</p><button class="btn small dark" data-act="export">Hacer copia</button></div>`;
   h+=`<section class="sec"><div class="sec-h"><h2 class="h2">Olvidadas</h2><span class="hint">${S.settings.forgotten} días o más sin usar</span></div>`;
-  h+=fl.length?`<div class="hscroll">${fl.map(x=>`<button class="tile" data-act="detail" data-id="${x.it.id}"><span class="ph">${imgTag(x.it)}</span><span class="tn">${esc(x.it.name)}</span><span class="tm">${x.never?'Nunca usada':x.days+' días'}</span></button>`).join('')}</div>`:`<p class="hint">Ninguna. Estás rotando bien tu ropa.</p>`;
+  h+=fl.length?`<div class="hscroll">${fl.map(x=>`<button class="tile" data-act="detail" data-id="${x.it.id}"><span class="ph">${imgTag(x.it,true)}</span><span class="tn">${esc(x.it.name)}</span><span class="tm">${x.never?'Nunca usada':x.days+' días'}</span></button>`).join('')}</div>`:`<p class="hint">Ninguna. Estás rotando bien tu ropa.</p>`;
   h+=`</section>`;
   // usage
   let list=S.items.filter(i=>S.dataCat==='all'||i.cat===S.dataCat);
@@ -731,7 +741,7 @@ async function loadPhoto(file){
   try{
     const url=URL.createObjectURL(file);const im=new Image();
     await new Promise((r,j)=>{im.onload=r;im.onerror=j;im.src=url});
-    const max=1000,s=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight));
+    const max=IMG_MAX,s=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight));
     const c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);
     c.getContext('2d',{willReadFrequently:true}).drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(url);
     D.src=c;D.hasPhoto=true;await processPhoto();drawEdit();
@@ -740,7 +750,7 @@ async function loadPhoto(file){
 async function processPhoto(){
   if(!D||!D.src)return;
   const c=D.removeBg?removeBg(D.src,D.tol):D.src;
-  D.blob=await new Promise(r=>c.toBlob(r,D.removeBg?'image/png':'image/jpeg',.86));
+  D.blob=await encodeCanvas(c,D.removeBg);D.thumb=await encodeCanvas(scaleCanvas(c,THUMB_MAX),D.removeBg);
   D.fit=D.removeBg?'contain':'cover';D.newImg=true;updatePreview();
 }
 function removeBg(src,tol){
@@ -763,7 +773,7 @@ async function saveItem(){
   const old=get(D.id);const name=(D.name||'').trim()||(CATS[D.cat].label+(D.color?' '+D.color:''));
   const price=parseFloat(String(D.price||'').replace(',','.'));
   const it={id:D.id,name,cat:D.cat,color:D.color,styles:D.styles.length?D.styles:['casual'],season:D.season,price:price>0?price:null,wild:!!D.wild,laundry:!!D.laundry,added:old?.added||todayISO(),demo:old?.demo&&!D.newImg?old.demo:false};
-  if(D.hasPhoto){it.img=D.newImg?D.blob:old.img;it.fit=D.newImg?D.fit:old.fit;it.illus=false}
+  if(D.hasPhoto){it.img=D.newImg?D.blob:old.img;it.thumb=D.newImg?D.thumb:old.thumb;it.fit=D.newImg?D.fit:old.fit;it.illus=false}
   else{it.img=svgBlob(garmentSVG(old&&old.illus&&old.kind&&old.cat===D.cat?old.kind:defaultKind[D.cat],D.color));it.kind=old&&old.cat===D.cat?old.kind:undefined;it.fit='contain';it.illus=true}
   if(old&&old.cat!==it.cat){for(const k of [...S.pairs]){const [a,b]=k.split('|');if(a===it.id||b===it.id)S.pairs.delete(k)}savePairs()}
   const i=S.items.findIndex(x=>x.id===it.id);if(i>=0)S.items[i]=it;else S.items.push(it);
@@ -866,7 +876,7 @@ function guideSheet(){
 function blobToDataURL(b){return new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=j;fr.readAsDataURL(b)})}
 function dataURLToBlob(u){const [h,b]=u.split(',');const mime=(h.match(/data:([^;,]+)/)||[])[1]||'application/octet-stream';if(/;base64/.test(h)){const bin=atob(b),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:mime})}return new Blob([decodeURIComponent(b)],{type:mime})}
 async function exportData(){
-  const items=await Promise.all(S.items.map(async it=>({...it,img:it.img?await blobToDataURL(it.img):null})));
+  const items=await Promise.all(S.items.map(async it=>{const {thumb,...rest}=it;return {...rest,img:it.img?await blobToDataURL(it.img):null}}));
   const data={app:'percha',version:1,exported:new Date().toISOString(),items,pairs:[...S.pairs],blocks:[...S.blocks],rules:S.rules,wears:S.wears,plan:S.plan,settings:S.settings};
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
   const fname=`percha-copia-${todayISO()}.json`;
@@ -879,10 +889,11 @@ async function exportData(){
 async function applyImport(data){
   for(const s of['items','wears','kv'])await clearStore(s);
   for(const v of URLS.values())URL.revokeObjectURL(v.url);URLS.clear();
-  S.items=data.items.map(it=>({...it,img:it.img?dataURLToBlob(it.img):svgBlob(garmentSVG(defaultKind[it.cat],it.color))}));
+  S.items=data.items.map(({thumb,...it})=>({...it,img:it.img?dataURLToBlob(it.img):svgBlob(garmentSVG(defaultKind[it.cat],it.color))}));
   S.pairs=new Set(data.pairs||[]);S.blocks=new Set(data.blocks||[]);S.rules=data.rules||[];S.wears=data.wears||[];S.plan=data.plan||{};S.settings={...S.settings,...(data.settings||{})};
   for(const it of S.items)await put('items',it);for(const w of S.wears)await put('wears',w);
   savePairs();saveRules();savePlan();saveSettings();saveKV('seeded',true);computeStats();
+  ensureThumbs();
 }
 
 /* ---------- actions ---------- */
@@ -899,7 +910,7 @@ async function deleteItem(id){
   S.items=S.items.filter(i=>i.id!==id);await del('items',id);
   for(const k of [...S.pairs]){const [a,b]=k.split('|');if(a===id||b===id)S.pairs.delete(k)}savePairs();
   for(const [d,p] of Object.entries(S.plan))if(SLOTS.some(k=>p[k]===id))S.plan[d]={style:p.style};savePlan();
-  const u=URLS.get(id);if(u){URL.revokeObjectURL(u.url);URLS.delete(id)}
+  dropURLs(id);
   for(const k of SLOTS)if(S.flow[k]===id)resetFlow(true);
   computeStats();
 }
@@ -1040,6 +1051,7 @@ async function boot(){
   if(!seeded)await seedDemo();
   applyTheme(S.settings.theme||'auto');
   computeStats();render();
+  ensureThumbs();
   if(S.noStore)toast('Este navegador no permite guardar datos. Lo que hagas se perderá al cerrar.');
 }
 boot();

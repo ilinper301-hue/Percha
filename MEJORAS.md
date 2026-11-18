@@ -8,7 +8,7 @@ Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abaj
 
 ## Fase 1 · Fotos y copia de seguridad (lo más urgente)
 
-- [ ] **1.1 Miniaturas aparte.** Hoy cada prenda guarda una sola imagen de hasta 1000 px (`loadPhoto`, `processPhoto`) y se usa también en miniaturas de 28-52 px. Guardar `img` (≈800 px) + `thumb` (≈200 px) y usar `thumb` en `mini()`, rejillas y semana. Migrar las prendas existentes al arrancar (generar `thumb` si falta).
+- [x] **1.1 Miniaturas aparte.** Hoy cada prenda guarda una sola imagen de hasta 1000 px (`loadPhoto`, `processPhoto`) y se usa también en miniaturas de 28-52 px. Guardar `img` (≈800 px) + `thumb` (≈200 px) y usar `thumb` en `mini()`, rejillas y semana. Migrar las prendas existentes al arrancar (generar `thumb` si falta).
 - [ ] **1.2 WebP.** Codificar en `image/webp` (con transparencia si se quitó el fondo) y caer a PNG/JPEG si el navegador no lo admite (`canvas.toBlob` devuelve otro tipo).
 - [ ] **1.3 Copia en ZIP.** `exportData` mete todas las fotos en base64 dentro de un único JSON: con 100+ prendas puede agotar la memoria del móvil. Pasar a ZIP (`data.json` + carpeta `fotos/`) con un compresor mínimo propio (formato ZIP "store", sin dependencias). Mantener la importación del JSON antiguo.
 - [ ] **1.4 Compartir la copia.** Usar `navigator.share({files:[...]})` cuando exista (para mandarla a Drive, WhatsApp, etc.) y la descarga como alternativa.
@@ -54,3 +54,4 @@ Orden recomendado: fase 1 → 2 → 3 → 4. Dentro de cada fase, de arriba abaj
 | Fecha | Tarea | Notas |
 |---|---|---|
 | 13-11-2026 | Análisis | Plan creado. Nada implementado todavía. |
+| 18-11-2026 | 1.1 Miniaturas | Foto a 800 px + `thumb` a 320 px (no 200: las rejillas de 2 columnas se ven borrosas en pantallas 3x). `thumb` en `mini()`, rejillas y "Hace tiempo"; foto grande en ficha y tarjeta de outfit. Migración al arrancar e importar (`ensureThumbs`). La copia no exporta miniaturas. Helpers `scaleCanvas`/`encodeCanvas` listos para 1.2. Caché `percha-v4`. |
