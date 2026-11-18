@@ -45,7 +45,7 @@ export function render(){
   v.innerHTML=({hoy:viewHoy,armario:viewArmario,semana:viewSemana,datos:viewDatos})[S.view]();
   const fab=$('#fab');fab.hidden=S.view!=='armario';fab.innerHTML=ic('plus',26,1.8);
 }
-export function demoBanner(){if(!hasDemo())return '';return `<div class="banner"><p>Estás viendo un armario de ejemplo.</p><button class="btn small dark" data-act="clearDemo">Empezar con el mío</button></div>`}
+export function demoBanner(){if(!hasDemo())return '';return `<div class="banner"><p>Estás viendo un armario de ejemplo.</p><button class="btn small primary" data-act="clearDemo">Empezar con el mío</button></div>`}
 
 /* ----- HOY ----- */
 export function viewHoy(){
@@ -83,9 +83,9 @@ export function flowHTML(target){
   const titles=['Parte de arriba','Parte de abajo','Calzado'];
   h+=`<div class="stephead"><div><h2 class="h2">${titles[step]}</h2><p class="sub">${base?'Combinan con '+esc(base.name):'Primero lo que hace más que no te pones'}</p></div>${step===0&&combos().length?`<button class="btn small" data-act="surprise">${ic('shuffle',16,1.8)}Sorpréndeme</button>`:''}</div>`;
   if(!all.length){
-    h+=`<div class="empty"><h2 class="h2">Aún no hay ${CATS[cat].plural.toLowerCase()}</h2><p>Añade fotos de tu ropa desde el armario.</p><button class="btn dark" data-act="addItem" data-cat="${cat}">Añadir ${CATS[cat].one}</button></div>`;
+    h+=`<div class="empty"><h2 class="h2">Aún no hay ${CATS[cat].plural.toLowerCase()}</h2><p>Añade fotos de tu ropa desde el armario.</p><button class="btn primary" data-act="addItem" data-cat="${cat}">Añadir ${CATS[cat].one}</button></div>`;
   }else if(!good.length){
-    h+=`<div class="empty"><h2 class="h2">${base?'Nada combina con esto':'Nada disponible'}</h2><p>${base?(S.settings.suggest===false?'Indica qué '+(cat==='shoes'?'calzado':'prendas')+' combinan con '+esc(base.name)+'.':'No hay sugerencias para '+esc(base.name)+(base.color?'':' porque no tiene color asignado')+'. Puedes marcar tú las combinaciones o mirar en otras opciones.'):'Todo está en el cesto o fuera de temporada.'}</p>${base?`<button class="btn dark" data-act="compat" data-id="${base.id}">Configurar combinaciones</button>`:''}</div>`;
+    h+=`<div class="empty"><h2 class="h2">${base?'Nada combina con esto':'Nada disponible'}</h2><p>${base?(S.settings.suggest===false?'Indica qué '+(cat==='shoes'?'calzado':'prendas')+' combinan con '+esc(base.name)+'.':'No hay sugerencias para '+esc(base.name)+(base.color?'':' porque no tiene color asignado')+'. Puedes marcar tú las combinaciones o mirar en otras opciones.'):'Todo está en el cesto o fuera de temporada.'}</p>${base?`<button class="btn primary" data-act="compat" data-id="${base.id}">Configurar combinaciones</button>`:''}</div>`;
   }else{
     h+=`<div class="grid">${good.map(i=>tile(i,{act:'pick',sug:base&&compatReason(i,base)==='suggest'})).join('')}</div>`;
   }
@@ -123,7 +123,7 @@ export function viewArmario(){
   let h=demoBanner()+`<div class="row between" style="margin-top:10px"><h1 class="h1" style="margin:0">Armario</h1><span class="sub num">${S.items.length} prendas</span></div>`;
   h+=`<div class="chips" style="margin-top:14px">${CAT_ORDER.map(c=>`<button class="pill${S.armCat===c?' on':''}" data-act="armCat" data-v="${c}">${CATS[c].plural}<span class="c num">${cnt(c)}</span></button>`).join('')}</div>`;
   h+=`<div class="row between" style="margin:14px 0 16px"><select class="sel" id="arm-sort" data-change="armSort" aria-label="Ordenar">${[['recent','Añadidas recientemente'],['most','Más usadas'],['least','Menos usadas'],['last','Más tiempo sin usar'],['name','Nombre'],['color','Color']].map(([k,l])=>`<option value="${k}"${S.armSort===k?' selected':''}>${l}</option>`).join('')}</select>${laundryN?`<button class="pill${S.armLaundry?' on':''}" data-act="armLaundry">En el cesto<span class="c num">${laundryN}</span></button>`:''}</div>`;
-  if(!list.length)h+=`<div class="empty"><h2 class="h2">${S.armLaundry?'Nada en el cesto':'Sin '+CATS[S.armCat].plural.toLowerCase()}</h2><p>${S.armLaundry?'Toda la ropa de esta categoría está limpia.':'Haz una foto a la prenda sobre un fondo liso y añádela.'}</p>${S.armLaundry?'':`<button class="btn dark" data-act="addItem" data-cat="${S.armCat}">Añadir ${CATS[S.armCat].one}</button>`}</div>`;
+  if(!list.length)h+=`<div class="empty"><h2 class="h2">${S.armLaundry?'Nada en el cesto':'Sin '+CATS[S.armCat].plural.toLowerCase()}</h2><p>${S.armLaundry?'Toda la ropa de esta categoría está limpia.':'Haz una foto a la prenda sobre un fondo liso y añádela.'}</p>${S.armLaundry?'':`<button class="btn primary" data-act="addItem" data-cat="${S.armCat}">Añadir ${CATS[S.armCat].one}</button>`}</div>`;
   else h+=`<div class="grid">${list.map(i=>tile(i)).join('')}</div>`;
   if(S.armLaundry&&list.length)h+=`<button class="btn block" style="margin-top:20px" data-act="allClean">Marcar todo como limpio</button>`;
   return h;
@@ -136,7 +136,7 @@ export function viewSemana(){
   const canGen=ds.some(d=>d>=t);
   let h=`<div class="row between" style="margin-top:10px"><h1 class="h1" style="margin:0">Semana</h1><div class="weeknav"><button class="iconbtn" data-act="week" data-d="-1" aria-label="Semana anterior">${ic('left',20)}</button><span>${range}</span><button class="iconbtn" data-act="week" data-d="1" aria-label="Semana siguiente">${ic('right',20)}</button></div></div>`;
   h+=`<p class="sub" style="margin-top:6px">Combinaciones válidas, sin repetir prenda en ${S.settings.noRepeat} ${S.settings.noRepeat===1?'día':'días'} y dando prioridad a lo que menos usas. Toca un día para ajustarlo.</p>`;
-  if(canGen)h+=`<button class="btn dark block" style="margin-top:16px" data-act="genWeek">${ic('refresh',18,1.8)}${ds.some(d=>d>=t&&S.plan[d]&&S.plan[d].top)?'Regenerar semana':'Generar semana'}</button>`;
+  if(canGen)h+=`<button class="btn primary block" style="margin-top:16px" data-act="genWeek">${ic('refresh',18,1.8)}${ds.some(d=>d>=t&&S.plan[d]&&S.plan[d].top)?'Regenerar semana':'Generar semana'}</button>`;
   h+=`<ul class="days">`+ds.map(d=>{
     const dd=parseD(d),past=d<t,p=S.plan[d]||{},w=S.wears.find(x=>x.date===d);
     const o=w||(p.top?p:null);
@@ -153,7 +153,7 @@ export function viewDatos(){
   let h=`<h1 class="h1" style="margin-top:10px">Datos</h1>`;
   h+=`<div class="stats3"><div class="stat"><b>${S.wears.length}</b><span>Outfits registrados</span></div><div class="stat"><b>${active30}<small style="font-size:15px;color:var(--muted)">/${S.items.length}</small></b><span>Prendas usadas en 30 días</span></div><div class="stat"><b>${fl.length}</b><span>Olvidadas</span></div></div>`;
   const real=S.items.some(i=>!i.demo);const le=S.settings.lastExport;
-  if(real&&(!le||diffDays(t,le)>30))h+=`<div class="banner" style="margin-top:16px"><p>${le?'Tu última copia es de hace '+diffDays(t,le)+' días.':'Aún no has hecho ninguna copia de seguridad.'}</p><button class="btn small dark" data-act="export">Hacer copia</button></div>`;
+  if(real&&(!le||diffDays(t,le)>30))h+=`<div class="banner" style="margin-top:16px"><p>${le?'Tu última copia es de hace '+diffDays(t,le)+' días.':'Aún no has hecho ninguna copia de seguridad.'}</p><button class="btn small primary" data-act="export">Hacer copia</button></div>`;
   h+=`<section class="sec"><div class="sec-h"><h2 class="h2">Olvidadas</h2><span class="hint">${S.settings.forgotten} días o más sin usar</span></div>`;
   h+=fl.length?`<div class="hscroll">${fl.map(x=>`<button class="tile" data-act="detail" data-id="${x.it.id}"><span class="ph">${imgTag(x.it,true)}</span><span class="tn">${esc(x.it.name)}</span><span class="tm">${x.never?'Nunca usada':x.days+' días'}</span></button>`).join('')}</div>`:`<p class="hint">Ninguna. Estás rotando bien tu ropa.</p>`;
   h+=`</section>`;
@@ -373,7 +373,7 @@ export function settingsSheet(){
   const opts=COLORS.map(([n])=>`<option value="${n}">${cap(n)}</option>`).join('');
   h+=`<div class="rulerow"><select class="sel" id="rule-a" aria-label="Primer color">${opts}</select><select class="sel" id="rule-b" aria-label="Segundo color">${opts.replace('value="beige"','value="beige" selected')}</select><button class="btn small" data-act="addRule">Añadir</button></div></div>`;
   h+=`<div class="field"><span class="label">Copia de seguridad</span><p class="hint">Todo se guarda solo en este móvil. Si borras los datos del navegador se pierde, así que guarda una copia de vez en cuando. ${s.lastExport?'Última copia: '+fmtShort(s.lastExport)+'.':'Aún no has hecho ninguna.'}</p><div class="row"><button class="btn" data-act="export">Exportar copia</button><button class="btn" data-act="importPick">Importar copia</button></div>${CAN_SHARE?`<button class="btn block" data-act="shareBackup" style="margin-top:8px">Compartir copia (Drive, WhatsApp…)</button>`:''}`;
-  if(pendingImport)h+=`<div class="confirm"><p>La copia tiene ${pendingImport.items.length} prendas y ${(pendingImport.wears||[]).length} outfits. Sustituirá todo lo que hay ahora en la app.</p><div class="row"><button class="btn small dark" data-act="importDo">Sustituir</button><button class="btn small ghost" data-act="importCancel">Cancelar</button></div></div>`;
+  if(pendingImport)h+=`<div class="confirm"><p>La copia tiene ${pendingImport.items.length} prendas y ${(pendingImport.wears||[]).length} outfits. Sustituirá todo lo que hay ahora en la app.</p><div class="row"><button class="btn small primary" data-act="importDo">Sustituir</button><button class="btn small ghost" data-act="importCancel">Cancelar</button></div></div>`;
   h+=`</div>`;
   h+=`<div class="field"><span class="label">Datos</span>`;
   if(hasDemo())h+=`<button class="btn block" data-act="clearDemo">Borrar el armario de ejemplo</button>`;
